@@ -45,3 +45,4 @@ manifest:
   group-filter: [+optional]
   self:
     west-commands: scripts/west-commands.yml
+# ZMK build initiate
