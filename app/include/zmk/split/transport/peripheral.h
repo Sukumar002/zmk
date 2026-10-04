@@ -36,6 +36,9 @@ int zmk_split_transport_peripheral_command_handler(
     const struct zmk_split_transport_peripheral *transport,
     struct zmk_split_transport_central_command cmd);
 
+int zmk_split_peripheral_report_event(
+    const struct zmk_split_transport_peripheral_event *event);
+
 #define ZMK_SPLIT_TRANSPORT_PERIPHERAL_REGISTER(name, _api, priority)                              \
     STRUCT_SECTION_ITERABLE_NAMED(zmk_split_transport_peripheral, _CONCAT(priority, _##name),      \
                                   name) = {                                                        \
