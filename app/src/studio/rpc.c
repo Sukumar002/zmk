@@ -131,6 +131,13 @@ static bool rpc_tx_buffer_write(pb_ostream_t *stream, const uint8_t *buf, size_t
         uint32_t claim_len = ring_buf_put_claim(&rpc_tx_buf, &write_buf, count - written);
 
         if (claim_len == 0) {
+            // The buffer is full. Ask the transport to drain rather than spinning
+            // on the assumption that it already scheduled one — a full buffer
+            // always satisfies a capacity-relative drain threshold, so this makes
+            // progress guaranteed instead of dependent on the transport's
+            // bookkeeping, and yields the CPU while we wait for room.
+            selected_transport->tx_notify(&rpc_tx_buf, 0, false, user_data);
+            k_yield();
             continue;
         }
 
@@ -176,6 +183,25 @@ static pb_ostream_t pb_ostream_for_tx_buf(void *user_data) {
     return stream;
 }
 
+// Queue one framing byte, waiting for room rather than dropping it.
+//
+// ring_buf_put writes nothing and reports 0 when the buffer is full, and both
+// call sites ignored that. Losing the SOF costs one response; losing the EOF is
+// worse — the payload arrives in full but the frame never terminates, so the
+// client's decoder waits forever on a response it can never complete, and
+// because calls are serialised behind one mutex every later request dies with it.
+// The payload path already blocks for room (rpc_tx_buffer_write); these two bytes
+// have to do the same. Only the transports that drain synchronously, i.e. USB,
+// could get away with it: their buffer is always empty by the time we get here.
+static void put_framing_byte(uint8_t framing_byte, bool msg_done, void *user_data) {
+    while (ring_buf_put(&rpc_tx_buf, &framing_byte, 1) == 0) {
+        selected_transport->tx_notify(&rpc_tx_buf, 0, false, user_data);
+        k_yield();
+    }
+
+    selected_transport->tx_notify(&rpc_tx_buf, 1, msg_done, user_data);
+}
+
 static int send_response(const zmk_studio_Response *resp) {
     k_mutex_lock(&rpc_transport_mutex, K_FOREVER);
 
@@ -187,10 +213,7 @@ static int send_response(const zmk_studio_Response *resp) {
 
     pb_ostream_t stream = pb_ostream_for_tx_buf(user_data);
 
-    uint8_t framing_byte = FRAMING_SOF;
-    ring_buf_put(&rpc_tx_buf, &framing_byte, 1);
-
-    selected_transport->tx_notify(&rpc_tx_buf, 1, false, user_data);
+    put_framing_byte(FRAMING_SOF, false, user_data);
 
     /* Now we are ready to encode the message! */
     bool status = pb_encode(&stream, &zmk_studio_Response_msg, resp);
@@ -199,13 +222,20 @@ static int send_response(const zmk_studio_Response *resp) {
 #if !IS_ENABLED(CONFIG_NANOPB_NO_ERRMSG)
         LOG_ERR("Failed to encode the message %s", stream.errmsg);
 #endif // !IS_ENABLED(CONFIG_NANOPB_NO_ERRMSG)
+        // Terminate the frame even though it's now garbage. Bailing out without an
+        // EOF left the client waiting on a response that could never complete;
+        // a short frame at least fails its decode, which the client can report.
+        put_framing_byte(FRAMING_EOF, true, user_data);
+
+        // Returning straight out held rpc_transport_mutex for good. The RPC
+        // thread could still re-lock it (Zephyr mutexes are owner-recursive), so
+        // requests kept working while the notification path — which runs on
+        // another thread — blocked forever.
+        k_mutex_unlock(&rpc_transport_mutex);
         return -EINVAL;
     }
 
-    framing_byte = FRAMING_EOF;
-    ring_buf_put(&rpc_tx_buf, &framing_byte, 1);
-
-    selected_transport->tx_notify(&rpc_tx_buf, 1, true, user_data);
+    put_framing_byte(FRAMING_EOF, true, user_data);
 
 exit:
     k_mutex_unlock(&rpc_transport_mutex);

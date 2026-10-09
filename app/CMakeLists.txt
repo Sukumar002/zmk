@@ -16,6 +16,10 @@ if(CONFIG_ZMK_BEHAVIOR_LOCAL_IDS)
   zephyr_linker_sources(DATA_SECTIONS include/linker/zmk-behavior-local-id-map.ld)
 endif()
 
+if(CONFIG_ZMK_BEHAVIOR_RUNTIME_EDITING)
+  zephyr_linker_sources(SECTIONS include/linker/zmk-behavior-runtime-slots.ld)
+endif()
+
 zephyr_syscall_header(${APPLICATION_SOURCE_DIR}/include/drivers/behavior.h)
 zephyr_syscall_header(${APPLICATION_SOURCE_DIR}/include/drivers/input_processor.h)
 zephyr_syscall_header(${APPLICATION_SOURCE_DIR}/include/drivers/ext_power.h)
@@ -68,6 +72,7 @@ if ((NOT CONFIG_ZMK_SPLIT) OR CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
   target_sources_ifdef(CONFIG_ZMK_BEHAVIOR_STUDIO_UNLOCK app PRIVATE src/behaviors/behavior_studio_unlock.c)
   target_sources_ifdef(CONFIG_ZMK_BEHAVIOR_INPUT_TWO_AXIS app PRIVATE src/behaviors/behavior_input_two_axis.c)
   target_sources(app PRIVATE src/combo.c)
+  target_sources_ifdef(CONFIG_ZMK_BEHAVIOR_RUNTIME_EDITING app PRIVATE src/behavior_runtime.c)
   target_sources_ifdef(CONFIG_ZMK_BEHAVIOR_TAP_DANCE app PRIVATE src/behaviors/behavior_tap_dance.c)
   target_sources(app PRIVATE src/behavior_queue.c)
   target_sources(app PRIVATE src/conditional_layer.c)
@@ -102,6 +107,7 @@ add_subdirectory_ifdef(CONFIG_ZMK_SPLIT src/split)
 
 target_sources_ifdef(CONFIG_USB_DEVICE_STACK app PRIVATE src/usb.c)
 target_sources_ifdef(CONFIG_ZMK_USB app PRIVATE src/usb_hid.c)
+target_sources_ifdef(CONFIG_ZMK_SPLIT_BATTERY_USB_HID app PRIVATE src/split_battery_usb_hid.c)
 target_sources_ifdef(CONFIG_ZMK_RGB_UNDERGLOW app PRIVATE src/rgb_underglow.c)
 target_sources_ifdef(CONFIG_ZMK_BACKLIGHT app PRIVATE src/backlight.c)
 target_sources_ifdef(CONFIG_ZMK_LOW_PRIORITY_WORK_QUEUE app PRIVATE src/workqueue.c)
@@ -125,6 +131,7 @@ if (CONFIG_ZMK_STUDIO_RPC)
                         ${ZEPHYR_ZMK_STUDIO_MESSAGES_MODULE_DIR}/proto/zmk/core.proto
                         ${ZEPHYR_ZMK_STUDIO_MESSAGES_MODULE_DIR}/proto/zmk/behaviors.proto
                         ${ZEPHYR_ZMK_STUDIO_MESSAGES_MODULE_DIR}/proto/zmk/keymap.proto
+                        ${ZEPHYR_ZMK_STUDIO_MESSAGES_MODULE_DIR}/proto/zmk/combos.proto
   )
 
   target_include_directories(app PUBLIC ${CMAKE_CURRENT_BINARY_DIR})

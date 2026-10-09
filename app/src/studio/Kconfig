@@ -99,15 +99,42 @@ endmenu
 
 config ZMK_STUDIO_RPC_THREAD_STACK_SIZE
     int "RPC Thread Stack Size"
+    # The decoded zmk_studio_Request is a stack local on this thread (rpc.c
+    # rpc_main). set_custom_behavior carries a static ConfigField array
+    # (SetCustomBehaviorRequest.config, see behaviors.options.in) that is charged
+    # to this stack, larger than any keymap/combo request, so give it headroom.
+    default 8192 if ZMK_BEHAVIOR_RUNTIME_EDITING
     default 4096
 
 config ZMK_STUDIO_RPC_RX_BUF_SIZE
     int "RX Buffer Size"
+    # Combo edit/add requests carry a Combo message (packed key_positions array
+    # plus several varints, e.g. require_prior_idle_ms = -1 encodes as 10 bytes),
+    # far larger than any keymap request. The RX ring buffer must hold a whole
+    # request or the transport drops the overflow and pb_decode blocks forever on
+    # the truncated message. 30 bytes is fine for stock Studio but not for
+    # runtime combo editing.
+    #
+    # Custom-behaviour add/set requests are larger still: AddCustomBehaviorRequest
+    # carries up to 8 ConfigField submessages (one of which is a 32-entry
+    # hold_trigger_key_positions array), each field carrying key (≤32) +
+    # display_name (≤48) + value (+ schema). Worst case ≈ kind(25) +
+    # display_name(49) + 1 positions field(~165) + 7 scalar fields(~108 each) ≈
+    # 1000 bytes wire, plus the request envelope and a little framing-escape
+    # overhead. 1024 holds it with headroom; the 256-byte combo size would drop
+    # the overflow and hang the decode. Costs ~768 B of static RAM.
+    default 1024 if ZMK_BEHAVIOR_RUNTIME_EDITING
+    default 256 if ZMK_COMBO_RUNTIME_EDITING
     default 30
 
 config ZMK_STUDIO_RPC_TX_BUF_SIZE
     int "TX Buffer Size"
-    default 64
+    # Transports drain this buffer once it is half full, so it has to hold a
+    # comfortable multiple of one transport fragment or the encoder stalls waiting
+    # for room on nearly every chunk and leaves the radio idle between
+    # indications. At 64 the half-full mark was 32 bytes, below the 62 a single
+    # BLE indication now carries. 256 lets the encoder run ahead of the link.
+    default 256
 
 endif
 

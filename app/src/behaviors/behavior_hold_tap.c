@@ -11,6 +11,7 @@
 #include <zmk/keys.h>
 #include <zephyr/logging/log.h>
 #include <zmk/behavior.h>
+#include <zmk/behavior_runtime.h>
 #include <zmk/matrix.h>
 #include <zmk/endpoints.h>
 #include <zmk/event_manager.h>
@@ -856,8 +857,10 @@ static int behavior_hold_tap_init(const struct device *dev) {
     return 0;
 }
 
-#define KP_INST(n)                                                                                 \
-    static const struct behavior_hold_tap_config behavior_hold_tap_config_##n = {                  \
+// The config initializer body, shared by the const (built-in) and RAM
+// (runtime-editable pool) instance variants below.
+#define HT_CFG_INIT(n)                                                                             \
+    {                                                                                              \
         .tapping_term_ms = DT_INST_PROP(n, tapping_term_ms),                                       \
         .hold_behavior_dev = DEVICE_DT_NAME(DT_INST_PHANDLE_BY_IDX(n, bindings, 0)),               \
         .tap_behavior_dev = DEVICE_DT_NAME(DT_INST_PHANDLE_BY_IDX(n, bindings, 1)),                \
@@ -872,11 +875,143 @@ static int behavior_hold_tap_init(const struct device *dev) {
         .hold_trigger_on_release = DT_INST_PROP(n, hold_trigger_on_release),                       \
         .hold_trigger_key_positions = DT_INST_PROP(n, hold_trigger_key_positions),                 \
         .hold_trigger_key_positions_len = DT_INST_PROP_LEN(n, hold_trigger_key_positions),         \
-    };                                                                                             \
+    }
+
+#define HT_INST_COMMON(n)                                                                          \
     static struct behavior_hold_tap_data behavior_hold_tap_data_##n = {};                          \
     BEHAVIOR_DT_INST_DEFINE(n, behavior_hold_tap_init, NULL, &behavior_hold_tap_data_##n,          \
                             &behavior_hold_tap_config_##n, POST_KERNEL,                            \
                             CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &behavior_hold_tap_driver_api);
+
+// Built-in instance: config is const, lives in ROM.
+#define KP_INST_STD(n)                                                                             \
+    static const struct behavior_hold_tap_config behavior_hold_tap_config_##n = HT_CFG_INIT(n);    \
+    HT_INST_COMMON(n)
+
+#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_RUNTIME_EDITING)
+
+// The hold-tap editable-config schema (M2 read-only fields; the positions array
+// and hold/tap sub-bindings are added in M9). The Studio subsystem reads each
+// field generically from its struct offset — it never names "hold-tap".
+static const char *const ht_flavor_names[] = {
+    "hold-preferred",
+    "balanced",
+    "tap-preferred",
+    "tap-unless-interrupted",
+};
+
+static const struct zmk_behavior_runtime_field ht_fields[] = {
+    {
+        .key = "tapping_term_ms",
+        .display_name = "Tapping term (ms)",
+        .type = ZMK_BEHAVIOR_RT_FIELD_INT,
+        .offset = offsetof(struct behavior_hold_tap_config, tapping_term_ms),
+        .int_min = 0,
+        .int_max = 5000,
+    },
+    {
+        .key = "quick_tap_ms",
+        .display_name = "Quick tap (ms)",
+        .type = ZMK_BEHAVIOR_RT_FIELD_INT,
+        .offset = offsetof(struct behavior_hold_tap_config, quick_tap_ms),
+        .int_min = 0,
+        .int_max = 5000,
+    },
+    {
+        .key = "require_prior_idle_ms",
+        .display_name = "Require prior idle (ms)",
+        .type = ZMK_BEHAVIOR_RT_FIELD_INT,
+        .offset = offsetof(struct behavior_hold_tap_config, require_prior_idle_ms),
+        .int_min = -1,
+        .int_max = 5000,
+    },
+    {
+        .key = "flavor",
+        .display_name = "Flavor",
+        .type = ZMK_BEHAVIOR_RT_FIELD_ENUM,
+        .offset = offsetof(struct behavior_hold_tap_config, flavor),
+        .enum_names = ht_flavor_names,
+        .enum_len = ARRAY_SIZE(ht_flavor_names),
+    },
+    {
+        .key = "hold_trigger_on_release",
+        .display_name = "Hold trigger on release",
+        .type = ZMK_BEHAVIOR_RT_FIELD_BOOL,
+        .offset = offsetof(struct behavior_hold_tap_config, hold_trigger_on_release),
+    },
+    {
+        .key = "retro_tap",
+        .display_name = "Retro tap",
+        .type = ZMK_BEHAVIOR_RT_FIELD_BOOL,
+        .offset = offsetof(struct behavior_hold_tap_config, retro_tap),
+    },
+    {
+        .key = "hold_trigger_key_positions",
+        .display_name = "Hold trigger key positions",
+        .type = ZMK_BEHAVIOR_RT_FIELD_POSITIONS,
+        .offset = offsetof(struct behavior_hold_tap_config, hold_trigger_key_positions),
+        .len_offset = offsetof(struct behavior_hold_tap_config, hold_trigger_key_positions_len),
+        .positions_max = ZMK_BEHAVIOR_RUNTIME_POSITIONS_MAX,
+    },
+};
+
+static const struct zmk_behavior_runtime_descriptor ht_descriptor = {
+    .kind = "hold-tap",
+    .fields = ht_fields,
+    .fields_len = ARRAY_SIZE(ht_fields),
+};
+
+// Sentinel terminating a runtime slot's DT hold_trigger_key_positions list. The
+// flexible array is sized to ZMK_BEHAVIOR_RUNTIME_POSITIONS_MAX (32) for RAM
+// backing regardless of how many positions are actually meaningful, so a node
+// that wants N (<32) real positions lists them then pads to 32 with this
+// sentinel; the real length is recovered by scanning up to the first sentinel.
+// 0xffffffff can never be a real key position (positions are small indices).
+#define HT_RT_POSITIONS_END 0xffffffffU
+
+static int32_t ht_rt_positions_len(const int32_t *positions) {
+    int32_t len = 0;
+    while (len < ZMK_BEHAVIOR_RUNTIME_POSITIONS_MAX &&
+           (uint32_t)positions[len] != HT_RT_POSITIONS_END) {
+        len++;
+    }
+    return len;
+}
+
+// Runtime-editable pool instance: config lives in RAM (non-const), seeded from
+// the DT defaults at load, so the Studio subsystem can read (M2) and mutate
+// (M3+) it in place — the driver reads dev->config on every press, so edits are
+// live. The instance is also registered as a runtime slot for the subsystem.
+// The DT positions array is sized to its full capacity (32) for RAM backing.
+// A plain spare boots with no trigger positions (length 0); a FACTORY node
+// (runtime-default-active, M12) ships meaningful positions, so its real length
+// is recovered from the sentinel terminator. A runtime edit (set_custom_behavior)
+// overwrites both either way.
+#define KP_INST_RT(n)                                                                              \
+    static struct behavior_hold_tap_config behavior_hold_tap_config_##n = HT_CFG_INIT(n);          \
+    static int behavior_hold_tap_rt_init_##n(const struct device *dev) {                            \
+        behavior_hold_tap_config_##n.hold_trigger_key_positions_len = COND_CODE_1(                  \
+            DT_INST_PROP(n, runtime_default_active),                                                \
+            (ht_rt_positions_len(behavior_hold_tap_config_##n.hold_trigger_key_positions)), (0));   \
+        return behavior_hold_tap_init(dev);                                                         \
+    }                                                                                              \
+    static struct behavior_hold_tap_data behavior_hold_tap_data_##n = {};                          \
+    BEHAVIOR_DT_INST_DEFINE(n, behavior_hold_tap_rt_init_##n, NULL, &behavior_hold_tap_data_##n,    \
+                            &behavior_hold_tap_config_##n, POST_KERNEL,                             \
+                            CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &behavior_hold_tap_driver_api);    \
+    ZMK_BEHAVIOR_RUNTIME_SLOT_DEFINE_SEEDED(zmk_rt_slot_##n, DEVICE_DT_INST_GET(n),                 \
+                                            &behavior_hold_tap_config_##n, &ht_descriptor,          \
+                                            DT_INST_PROP(n, runtime_default_active),                \
+                                            DT_INST_PROP_OR(n, display_name, ""));
+
+#define KP_INST(n)                                                                                 \
+    COND_CODE_1(DT_INST_PROP(n, runtime_editable), (KP_INST_RT(n)), (KP_INST_STD(n)))
+
+#else
+
+#define KP_INST(n) KP_INST_STD(n)
+
+#endif // IS_ENABLED(CONFIG_ZMK_BEHAVIOR_RUNTIME_EDITING)
 
 DT_INST_FOREACH_STATUS_OKAY(KP_INST)
 

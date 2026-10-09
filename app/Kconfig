@@ -397,6 +397,24 @@ endchoice
 
 endif # ZMK_BATTERY_REPORTING
 
+config ZMK_SPLIT_BATTERY_USB_HID
+    bool "Report split peripheral battery levels over a vendor USB HID interface"
+    depends on ZMK_USB && ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING
+    help
+      Expose the peripherals' battery levels on a second, vendor-defined USB
+      HID interface (HID_1). Useful on dongle centrals where the host has no
+      BLE connection to read the proxied GATT Battery Services from. A host
+      program can read pushed input reports from the hidraw node or poll via
+      GET_REPORT.
+
+if ZMK_SPLIT_BATTERY_USB_HID
+
+# Reserve the second Zephyr USB HID instance (HID_1) next to ZMK's HID_0.
+config USB_HID_DEVICE_COUNT
+    default 2
+
+endif # ZMK_SPLIT_BATTERY_USB_HID
+
 config ZMK_IDLE_TIMEOUT
     int "Milliseconds of inactivity before entering idle state (OLED shutoff, etc)"
     default 30000
@@ -450,6 +468,39 @@ menu "Combo options"
 config ZMK_COMBO_MAX_PRESSED_COMBOS
     int "Maximum number of currently pressed combos"
     default 4
+
+config ZMK_COMBO_RUNTIME_EDITING
+    bool "Runtime combo editing (ZMK Studio)"
+    default y if ZMK_STUDIO_RPC
+    select SETTINGS
+    select ZMK_BEHAVIOR_LOCAL_IDS
+    select ZMK_KEYMAP_SETTINGS_STORAGE
+    help
+      Replace the compile-time combo array with a mutable bounded pool so combos
+      can be created, edited and deleted at runtime over the Studio RPC protocol.
+      Runtime edits are persisted to NVS (reusing the keymap settings-storage
+      machinery, which the selects above pull in).
+
+if ZMK_COMBO_RUNTIME_EDITING
+
+config ZMK_COMBO_MAX_COMBOS
+    int "Runtime combo pool size"
+    default 64
+    help
+      Number of slots in the runtime combo pool. Each slot has a stable pool
+      index used as its virtual key position and (later) NVS key, so this also
+      bounds the combo virtual-key-position block (see ZMK_COMBOS_LEN).
+
+config ZMK_COMBO_MAX_KEYS_PER_COMBO_RUNTIME
+    int "Max key positions per runtime-editable combo"
+    default 4
+    help
+      Effective max keys per combo is MAX(this, the devicetree-derived count).
+      Needed because the devicetree-derived maximum is 0 when no combos are
+      defined in devicetree (the common Studio case). Do not confuse with the
+      deprecated ZMK_COMBO_MAX_KEYS_PER_COMBO.
+
+endif # ZMK_COMBO_RUNTIME_EDITING
 
 config ZMK_COMBO_MAX_COMBOS_PER_KEY
     int "Deprecated: Max combos per key"
