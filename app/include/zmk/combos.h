@@ -35,6 +35,7 @@
 // and the runtime Kconfig (ZMK_COMBO_MAX_KEYS_PER_COMBO_RUNTIME, A1). Combos with
 // more positions than this are truncated by the accessor.
 #define ZMK_COMBO_MAX_KEYS 16
+#define ZMK_COMBO_NAME_MAX_LEN 32
 
 // Public, header-visible combo DTO. The behavior is expressed as a
 // zmk_behavior_binding (device name + params) so it resolves by name at invoke
@@ -46,6 +47,7 @@ struct zmk_combo {
     int32_t require_prior_idle_ms;
     uint32_t layer_mask;
     bool slow_release;
+    char name[ZMK_COMBO_NAME_MAX_LEN];
     struct zmk_behavior_binding behavior;
 };
 
