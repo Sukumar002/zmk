@@ -50,6 +50,7 @@ static bool encode_combos(pb_ostream_t *stream, const pb_field_t *field, void *c
         entry.combo.slow_release = combo.slow_release;
         strncpy(entry.combo.name, combo.name, sizeof(entry.combo.name) - 1);
         entry.combo.name[sizeof(entry.combo.name) - 1] = '\0';
+        entry.combo.display_order = combo.display_order;
 
         if (combo.behavior.behavior_dev) {
             entry.combo.has_binding = true;
@@ -124,6 +125,7 @@ static zmk_combos_SetComboResponse combo_from_proto(const zmk_combos_Combo *src,
     }
     strncpy(out->name, src->name, sizeof(out->name) - 1);
     out->name[sizeof(out->name) - 1] = '\0';
+    out->display_order = src->display_order;
 
     if (zmk_behavior_validate_binding(&out->behavior) < 0) {
         return zmk_combos_SetComboResponse_SET_COMBO_RESP_INVALID_PARAMETERS;
