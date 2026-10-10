@@ -48,6 +48,7 @@ struct zmk_combo {
     uint32_t layer_mask;
     bool slow_release;
     char name[ZMK_COMBO_NAME_MAX_LEN];
+    uint16_t display_order;
     struct zmk_behavior_binding behavior;
 };
 
