@@ -75,6 +75,7 @@ struct combo_cfg {
     int16_t require_prior_idle_ms;
     int32_t timeout_ms;
     uint32_t layer_mask;
+    char name[ZMK_COMBO_NAME_MAX_LEN];
     struct zmk_behavior_binding behavior;
     // if slow release is set, the combo releases when the last key is released.
     // otherwise, the combo releases when the first key is released.
@@ -694,6 +695,8 @@ int zmk_combos_get(uint16_t idx, struct zmk_combo *out) {
     out->require_prior_idle_ms = c->require_prior_idle_ms;
     out->layer_mask = c->layer_mask;
     out->slow_release = c->slow_release;
+    strncpy(out->name, c->name, sizeof(out->name) - 1);
+    out->name[sizeof(out->name) - 1] = '\0';
     out->behavior = c->behavior;
 
     return 0;
@@ -733,6 +736,8 @@ int zmk_combos_set(uint16_t idx, const struct zmk_combo *combo) {
     for (int i = 0; i < combo->key_position_len; i++) {
         cfg.key_positions[i] = combo->key_positions[i];
     }
+    strncpy(cfg.name, combo->name, sizeof(cfg.name) - 1);
+    cfg.name[sizeof(cfg.name) - 1] = '\0';
 
     // Clean up any in-flight press of this slot against its old definition
     // before swapping it out (invokes a behavior, so do it before locking).
@@ -801,6 +806,8 @@ struct zmk_combo_setting {
     uint32_t param1;
     uint32_t param2;
     int16_t key_positions[MAX_COMBO_KEYS];
+    // Appended for backward compatibility with combo records saved by older firmware.
+    char name[ZMK_COMBO_NAME_MAX_LEN];
 } __packed;
 
 #define COMBO_SETTINGS_KEY "combos/c/%d"
@@ -840,10 +847,17 @@ int zmk_combos_save_changes(void) {
             for (int kp = 0; kp < kp_count; kp++) {
                 rec.key_positions[kp] = (int16_t)c->key_positions[kp];
             }
+            strncpy(rec.name, c->name, sizeof(rec.name) - 1);
+            rec.name[sizeof(rec.name) - 1] = '\0';
 
-            // Trim trailing unused key_positions slots (same trick as keymap).
-            size_t len =
-                offsetof(struct zmk_combo_setting, key_positions) + kp_count * sizeof(int16_t);
+            // Preserve the compact legacy record when unnamed. Named records include
+            // the appended name field; placing it after key_positions keeps old NVS
+            // records readable without migration.
+            size_t len = offsetof(struct zmk_combo_setting, key_positions) +
+                         kp_count * sizeof(int16_t);
+            if (rec.name[0] != '\0') {
+                len = offsetof(struct zmk_combo_setting, name) + strnlen(rec.name, sizeof(rec.name) - 1) + 1;
+            }
 
             ret = settings_save_one(setting_name, &rec, len);
         } else if (i < COMBO_STOCK_COUNT) {
@@ -970,6 +984,8 @@ static int combo_handle_set(const char *name, size_t len, settings_read_cb read_
         for (int kp = 0; kp < kp_count; kp++) {
             cfg.key_positions[kp] = rec.key_positions[kp];
         }
+        strncpy(cfg.name, rec.name, sizeof(cfg.name) - 1);
+        cfg.name[sizeof(cfg.name) - 1] = '\0';
 
         // Mark the slot used (loaded values are persisted, not pending).
         combos[idx] = cfg;
