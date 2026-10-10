@@ -76,6 +76,7 @@ struct combo_cfg {
     int32_t timeout_ms;
     uint32_t layer_mask;
     char name[ZMK_COMBO_NAME_MAX_LEN];
+    uint16_t display_order;
     struct zmk_behavior_binding behavior;
     // if slow release is set, the combo releases when the last key is released.
     // otherwise, the combo releases when the first key is released.
@@ -697,6 +698,7 @@ int zmk_combos_get(uint16_t idx, struct zmk_combo *out) {
     out->slow_release = c->slow_release;
     strncpy(out->name, c->name, sizeof(out->name) - 1);
     out->name[sizeof(out->name) - 1] = '\0';
+    out->display_order = c->display_order;
     out->behavior = c->behavior;
 
     return 0;
@@ -738,6 +740,7 @@ int zmk_combos_set(uint16_t idx, const struct zmk_combo *combo) {
     }
     strncpy(cfg.name, combo->name, sizeof(cfg.name) - 1);
     cfg.name[sizeof(cfg.name) - 1] = '\0';
+    cfg.display_order = combo->display_order;
 
     // Clean up any in-flight press of this slot against its old definition
     // before swapping it out (invokes a behavior, so do it before locking).
@@ -808,6 +811,8 @@ struct zmk_combo_setting {
     int16_t key_positions[MAX_COMBO_KEYS];
     // Appended for backward compatibility with combo records saved by older firmware.
     char name[ZMK_COMBO_NAME_MAX_LEN];
+    // Appended after name so records written by the combo-name firmware remain readable.
+    uint16_t display_order;
 } __packed;
 
 #define COMBO_SETTINGS_KEY "combos/c/%d"
@@ -849,14 +854,18 @@ int zmk_combos_save_changes(void) {
             }
             strncpy(rec.name, c->name, sizeof(rec.name) - 1);
             rec.name[sizeof(rec.name) - 1] = '\0';
+            rec.display_order = c->display_order;
 
             // Preserve the compact legacy record when unnamed. Named records include
             // the appended name field; placing it after key_positions keeps old NVS
             // records readable without migration.
             size_t len = offsetof(struct zmk_combo_setting, key_positions) +
                          kp_count * sizeof(int16_t);
-            if (rec.name[0] != '\0') {
-                len = offsetof(struct zmk_combo_setting, name) + strnlen(rec.name, sizeof(rec.name) - 1) + 1;
+            if (rec.display_order != 0) {
+                len = offsetof(struct zmk_combo_setting, display_order) + sizeof(rec.display_order);
+            } else if (rec.name[0] != '\0') {
+                len = offsetof(struct zmk_combo_setting, name) +
+                      strnlen(rec.name, sizeof(rec.name) - 1) + 1;
             }
 
             ret = settings_save_one(setting_name, &rec, len);
@@ -986,6 +995,7 @@ static int combo_handle_set(const char *name, size_t len, settings_read_cb read_
         }
         strncpy(cfg.name, rec.name, sizeof(cfg.name) - 1);
         cfg.name[sizeof(cfg.name) - 1] = '\0';
+        cfg.display_order = rec.display_order;
 
         // Mark the slot used (loaded values are persisted, not pending).
         combos[idx] = cfg;
