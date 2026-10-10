@@ -12,6 +12,7 @@
         /omit-if-no-ref/ msc: mouse_scroll {
             compatible = "zmk,behavior-input-two-axis";
             #binding-cells = <1>;
+            display-name = "Mouse Scroll";
             x-input-code = <INPUT_REL_HWHEEL>;
             y-input-code = <INPUT_REL_WHEEL>;
             time-to-max-speed-ms = <300>;
