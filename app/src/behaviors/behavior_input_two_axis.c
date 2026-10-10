@@ -56,6 +56,62 @@ struct behavior_input_two_axis_config {
     uint8_t acceleration_exponent;
 };
 
+
+#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+
+static const struct behavior_parameter_value_metadata mouse_move_param_values[] = {
+    {.display_name = "Move Up", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = MOVE_UP},
+    {.display_name = "Move Down", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = MOVE_DOWN},
+    {.display_name = "Move Left", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = MOVE_LEFT},
+    {.display_name = "Move Right", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = MOVE_RIGHT},
+};
+
+static const struct behavior_parameter_metadata_set mouse_move_param_metadata_set[] = {{
+    .param1_values = mouse_move_param_values,
+    .param1_values_len = ARRAY_SIZE(mouse_move_param_values),
+}};
+
+static const struct behavior_parameter_metadata mouse_move_metadata = {
+    .sets_len = ARRAY_SIZE(mouse_move_param_metadata_set),
+    .sets = mouse_move_param_metadata_set,
+};
+
+static const struct behavior_parameter_value_metadata mouse_scroll_param_values[] = {
+    {.display_name = "Scroll Up", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = SCRL_UP},
+    {.display_name = "Scroll Down", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = SCRL_DOWN},
+    {.display_name = "Scroll Left", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = SCRL_LEFT},
+    {.display_name = "Scroll Right", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = SCRL_RIGHT},
+};
+
+static const struct behavior_parameter_metadata_set mouse_scroll_param_metadata_set[] = {{
+    .param1_values = mouse_scroll_param_values,
+    .param1_values_len = ARRAY_SIZE(mouse_scroll_param_values),
+}};
+
+static const struct behavior_parameter_metadata mouse_scroll_metadata = {
+    .sets_len = ARRAY_SIZE(mouse_scroll_param_metadata_set),
+    .sets = mouse_scroll_param_metadata_set,
+};
+
+static int behavior_input_two_axis_get_parameter_metadata(
+    const struct device *dev, struct behavior_parameter_metadata *param_metadata) {
+    const struct behavior_input_two_axis_config *cfg = dev->config;
+
+    if (cfg->x_code == INPUT_REL_X && cfg->y_code == INPUT_REL_Y) {
+        *param_metadata = mouse_move_metadata;
+        return 0;
+    }
+
+    if (cfg->x_code == INPUT_REL_HWHEEL && cfg->y_code == INPUT_REL_WHEEL) {
+        *param_metadata = mouse_scroll_metadata;
+        return 0;
+    }
+
+    return -ENOTSUP;
+}
+
+#endif // IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+
 #if CONFIG_MINIMAL_LIBC
 static float powf(float base, float exponent) {
     // poor man's power implementation rounds the exponent down to the nearest integer.
@@ -284,7 +340,12 @@ static int on_keymap_binding_released(struct zmk_behavior_binding *binding,
 }
 
 static const struct behavior_driver_api behavior_input_two_axis_driver_api = {
-    .binding_pressed = on_keymap_binding_pressed, .binding_released = on_keymap_binding_released};
+    .binding_pressed = on_keymap_binding_pressed,
+    .binding_released = on_keymap_binding_released,
+#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+    .get_parameter_metadata = behavior_input_two_axis_get_parameter_metadata,
+#endif // IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+};
 
 #define ITA_INST(n)                                                                                \
     static struct behavior_input_two_axis_data behavior_input_two_axis_data_##n = {};              \
