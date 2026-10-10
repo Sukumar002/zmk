@@ -13,6 +13,7 @@
 #include <zephyr/sys/util.h> // CLAMP
 
 #include <zmk/behavior.h>
+#include <zmk/pointing_settings.h>
 #include <dt-bindings/zmk/pointing.h>
 
 #if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
@@ -159,6 +160,9 @@ static uint8_t get_acceleration_exponent(const struct behavior_input_two_axis_co
 
 static inline uint8_t get_acceleration_exponent(const struct behavior_input_two_axis_config *config,
                                                 uint16_t code) {
+    if (config->x_code == INPUT_REL_X && config->y_code == INPUT_REL_Y) {
+        return zmk_pointing_settings_acceleration();
+    }
     return config->acceleration_exponent;
 }
 
@@ -321,6 +325,17 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
 
     int16_t x = MOVE_X_DECODE(binding->param1);
     int16_t y = MOVE_Y_DECODE(binding->param1);
+    const struct behavior_input_two_axis_config *cfg = behavior_dev->config;
+
+    if (cfg->x_code == INPUT_REL_X && cfg->y_code == INPUT_REL_Y) {
+        int16_t speed = zmk_pointing_settings_move_speed();
+        x = x < 0 ? -speed : (x > 0 ? speed : 0);
+        y = y < 0 ? -speed : (y > 0 ? speed : 0);
+    } else if (cfg->x_code == INPUT_REL_HWHEEL && cfg->y_code == INPUT_REL_WHEEL) {
+        int16_t speed = zmk_pointing_settings_scroll_speed();
+        x = x < 0 ? -speed : (x > 0 ? speed : 0);
+        y = y < 0 ? -speed : (y > 0 ? speed : 0);
+    }
 
     behavior_input_two_axis_adjust_speed(behavior_dev, x, y);
     return 0;
@@ -334,6 +349,17 @@ static int on_keymap_binding_released(struct zmk_behavior_binding *binding,
 
     int16_t x = MOVE_X_DECODE(binding->param1);
     int16_t y = MOVE_Y_DECODE(binding->param1);
+    const struct behavior_input_two_axis_config *cfg = behavior_dev->config;
+
+    if (cfg->x_code == INPUT_REL_X && cfg->y_code == INPUT_REL_Y) {
+        int16_t speed = zmk_pointing_settings_move_speed();
+        x = x < 0 ? -speed : (x > 0 ? speed : 0);
+        y = y < 0 ? -speed : (y > 0 ? speed : 0);
+    } else if (cfg->x_code == INPUT_REL_HWHEEL && cfg->y_code == INPUT_REL_WHEEL) {
+        int16_t speed = zmk_pointing_settings_scroll_speed();
+        x = x < 0 ? -speed : (x > 0 ? speed : 0);
+        y = y < 0 ? -speed : (y > 0 ? speed : 0);
+    }
 
     behavior_input_two_axis_adjust_speed(behavior_dev, -x, -y);
     return 0;
