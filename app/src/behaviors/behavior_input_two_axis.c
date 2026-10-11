@@ -194,6 +194,24 @@ static void track_remainder(float *move, float *remainder) {
     *move = (int)new_move;
 }
 
+static float runtime_max_speed(const struct behavior_input_two_axis_config *config,
+                               uint16_t code, int16_t requested_speed) {
+    if (requested_speed == 0) {
+        return 0;
+    }
+
+    int16_t magnitude;
+    if (config->x_code == INPUT_REL_X && config->y_code == INPUT_REL_Y) {
+        magnitude = zmk_pointing_settings_move_speed();
+    } else if (config->x_code == INPUT_REL_HWHEEL && config->y_code == INPUT_REL_WHEEL) {
+        magnitude = zmk_pointing_settings_scroll_speed();
+    } else {
+        magnitude = requested_speed < 0 ? -requested_speed : requested_speed;
+    }
+
+    return requested_speed < 0 ? -(float)magnitude : (float)magnitude;
+}
+
 static float update_movement_1d(const struct behavior_input_two_axis_config *config, uint16_t code,
                                 struct movement_state_1d *state, int64_t now) {
     float move = 0;
@@ -203,10 +221,11 @@ static float update_movement_1d(const struct behavior_input_two_axis_config *con
     }
 
     int64_t move_duration = ticks_since_start(state->start_time, now, config->delay_ms);
-    LOG_DBG("Calculated speed: %f", (double)speed(config, code, state->speed, move_duration));
+    float max_speed = runtime_max_speed(config, code, state->speed);
+    LOG_DBG("Calculated speed: %f", (double)speed(config, code, max_speed, move_duration));
     move =
         (move_duration > 0)
-            ? (speed(config, code, state->speed, move_duration) * config->trigger_period_ms / 1000)
+            ? (speed(config, code, max_speed, move_duration) * config->trigger_period_ms / 1000)
             : 0;
 
     track_remainder(&(move), &(state->remainder));
@@ -325,17 +344,6 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
 
     int16_t x = MOVE_X_DECODE(binding->param1);
     int16_t y = MOVE_Y_DECODE(binding->param1);
-    const struct behavior_input_two_axis_config *cfg = behavior_dev->config;
-
-    if (cfg->x_code == INPUT_REL_X && cfg->y_code == INPUT_REL_Y) {
-        int16_t speed = zmk_pointing_settings_move_speed();
-        x = x < 0 ? -speed : (x > 0 ? speed : 0);
-        y = y < 0 ? -speed : (y > 0 ? speed : 0);
-    } else if (cfg->x_code == INPUT_REL_HWHEEL && cfg->y_code == INPUT_REL_WHEEL) {
-        int16_t speed = zmk_pointing_settings_scroll_speed();
-        x = x < 0 ? -speed : (x > 0 ? speed : 0);
-        y = y < 0 ? -speed : (y > 0 ? speed : 0);
-    }
 
     behavior_input_two_axis_adjust_speed(behavior_dev, x, y);
     return 0;
@@ -349,17 +357,6 @@ static int on_keymap_binding_released(struct zmk_behavior_binding *binding,
 
     int16_t x = MOVE_X_DECODE(binding->param1);
     int16_t y = MOVE_Y_DECODE(binding->param1);
-    const struct behavior_input_two_axis_config *cfg = behavior_dev->config;
-
-    if (cfg->x_code == INPUT_REL_X && cfg->y_code == INPUT_REL_Y) {
-        int16_t speed = zmk_pointing_settings_move_speed();
-        x = x < 0 ? -speed : (x > 0 ? speed : 0);
-        y = y < 0 ? -speed : (y > 0 ? speed : 0);
-    } else if (cfg->x_code == INPUT_REL_HWHEEL && cfg->y_code == INPUT_REL_WHEEL) {
-        int16_t speed = zmk_pointing_settings_scroll_speed();
-        x = x < 0 ? -speed : (x > 0 ? speed : 0);
-        y = y < 0 ? -speed : (y > 0 ? speed : 0);
-    }
 
     behavior_input_two_axis_adjust_speed(behavior_dev, -x, -y);
     return 0;
