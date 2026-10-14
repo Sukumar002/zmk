@@ -191,11 +191,12 @@ int display_event_handler(const zmk_event_t *eh) {
 
     switch (ev->state) {
     case ZMK_ACTIVITY_ACTIVE:
-        if (manual_display_off) {
-            stop_display_updates();
-        } else {
-            start_display_updates();
-        }
+        /*
+         * A fresh wake is treated as a new display session.
+         * Manual OLED-off is intentionally not persistent across sleep/wake.
+         */
+        manual_display_off = false;
+        start_display_updates();
         break;
     case ZMK_ACTIVITY_IDLE:
     case ZMK_ACTIVITY_SLEEP:
