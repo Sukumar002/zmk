@@ -10,3 +10,5 @@
 ZMK_EVENT_IMPL(zmk_battery_state_changed);
 
 ZMK_EVENT_IMPL(zmk_peripheral_battery_state_changed);
+
+ZMK_EVENT_IMPL(zmk_peripheral_charge_state_changed);
