@@ -15,6 +15,10 @@ struct k_work_q *zmk_display_work_q(void);
 bool zmk_display_is_initialized(void);
 int zmk_display_init(void);
 
+bool zmk_display_manual_power_is_on(void);
+void zmk_display_set_manual_power(bool on);
+void zmk_display_toggle_manual_power(void);
+
 /**
  * @brief Macro to define a ZMK event listener that handles the thread safety of fetching
  * the necessary state from the system work queue context, invoking a work callback
