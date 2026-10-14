@@ -32,6 +32,7 @@ static const uint8_t display_led_idx = DT_NODE_CHILD_IDX(DT_CHOSEN(zmk_display_l
 #endif
 
 static bool initialized = false;
+static bool manual_display_off = false;
 
 static lv_obj_t *screen;
 
@@ -72,8 +73,6 @@ void unblank_display_cb(struct k_work *work) {
 #endif // !IS_ENABLED(CONFIG_ARCH_POSIX)
 }
 
-#if IS_ENABLED(CONFIG_ZMK_DISPLAY_BLANK_ON_IDLE)
-
 void blank_display_cb(struct k_work *work) {
 #if !IS_ENABLED(CONFIG_ARCH_POSIX)
     k_timer_stop(&display_timer);
@@ -102,9 +101,27 @@ static void stop_display_updates() {
     k_work_submit_to_queue(zmk_display_work_q(), &blank_display_work);
 }
 
-#endif
-
 int zmk_display_is_initialized() { return initialized; }
+
+bool zmk_display_manual_power_is_on(void) { return !manual_display_off; }
+
+void zmk_display_set_manual_power(bool on) {
+    manual_display_off = !on;
+
+    if (!initialized || display == NULL) {
+        return;
+    }
+
+    if (on) {
+        start_display_updates();
+    } else {
+        stop_display_updates();
+    }
+}
+
+void zmk_display_toggle_manual_power(void) {
+    zmk_display_set_manual_power(manual_display_off);
+}
 
 static void initialize_theme() {
 #if IS_ENABLED(CONFIG_LV_USE_THEME_MONO)
@@ -174,7 +191,11 @@ int display_event_handler(const zmk_event_t *eh) {
 
     switch (ev->state) {
     case ZMK_ACTIVITY_ACTIVE:
-        start_display_updates();
+        if (manual_display_off) {
+            stop_display_updates();
+        } else {
+            start_display_updates();
+        }
         break;
     case ZMK_ACTIVITY_IDLE:
     case ZMK_ACTIVITY_SLEEP:
