@@ -94,12 +94,10 @@ static zmk_core_StatusOsMode studio_status_os_mode(void) {
         return zmk_core_StatusOsMode_ZMK_STUDIO_STATUS_OS_MODE_UNKNOWN;
     }
 
-    const struct studio_layout_shift_map_data_view *data =
-        studio_gui_alt_layout_shift->data;
+    const struct studio_layout_shift_map_data_view *data = studio_gui_alt_layout_shift->data;
 
-    return data->active
-               ? zmk_core_StatusOsMode_ZMK_STUDIO_STATUS_OS_MODE_WINDOWS
-               : zmk_core_StatusOsMode_ZMK_STUDIO_STATUS_OS_MODE_MACOS;
+    return data->active ? zmk_core_StatusOsMode_ZMK_STUDIO_STATUS_OS_MODE_WINDOWS
+                        : zmk_core_StatusOsMode_ZMK_STUDIO_STATUS_OS_MODE_MACOS;
 }
 #else
 static zmk_core_StatusOsMode studio_status_os_mode(void) {
@@ -144,7 +142,7 @@ static zmk_core_StatusSnapshot get_status_snapshot(void) {
     status.ble_profile_bonded = !zmk_ble_active_profile_is_open();
 #endif
 
-#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING) &&                              \
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING) &&                             \
     IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
     uint8_t battery_level;
     if (zmk_split_central_get_peripheral_battery_level(0, &battery_level) == 0) {
@@ -245,14 +243,16 @@ static int core_event_mapper(const zmk_event_t *eh, zmk_studio_Notification *n) 
 ZMK_RPC_EVENT_MAPPER(core, core_event_mapper, zmk_studio_core_lock_state_changed,
                      zmk_layer_state_changed, zmk_modifiers_state_changed, zmk_endpoint_changed,
                      zmk_hid_indicators_changed, zmk_usb_conn_state_changed,
-                     zmk_split_peripheral_status_changed
+                     zmk_split_peripheral_status_changed);
+
 #if IS_ENABLED(CONFIG_ZMK_BLE)
-                     , zmk_ble_active_profile_changed
+ZMK_RPC_EVENT_MAPPER_ADD_LISTENER(zmk_ble_active_profile_changed);
 #endif
+
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
-                     , zmk_peripheral_battery_state_changed
+ZMK_RPC_EVENT_MAPPER_ADD_LISTENER(zmk_peripheral_battery_state_changed);
 #endif
+
 #if IS_ENABLED(CONFIG_ZMK_STUDIO_STATUS_DONGLE_BATTERY)
-                     , zmk_battery_state_changed
+ZMK_RPC_EVENT_MAPPER_ADD_LISTENER(zmk_battery_state_changed);
 #endif
-);
