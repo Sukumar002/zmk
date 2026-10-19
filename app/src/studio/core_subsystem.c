@@ -270,8 +270,7 @@ static int core_event_mapper(const zmk_event_t *eh, zmk_studio_Notification *n) 
 ZMK_RPC_EVENT_MAPPER(core, core_event_mapper, zmk_studio_core_lock_state_changed,
                      zmk_layer_state_changed, zmk_modifiers_state_changed, zmk_endpoint_changed,
                      zmk_hid_indicators_changed, zmk_position_state_changed,
-                     zmk_usb_conn_state_changed,
-                     zmk_split_peripheral_status_changed);
+                     zmk_usb_conn_state_changed, zmk_split_peripheral_status_changed);
 
 #if IS_ENABLED(CONFIG_ZMK_BLE)
 ZMK_RPC_EVENT_MAPPER_ADD_LISTENER(zmk_ble_active_profile_changed);
