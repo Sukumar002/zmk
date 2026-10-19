@@ -41,7 +41,7 @@ manifest:
       path: modules/lib/gui/lvgl
       remote: zmkfirmware
     - name: zmk-studio-messages
-      revision: 9e23910cccc9234aaca554a98b5979594bbc3d02
+      revision: 26e96c4e5018eb39e2f004518c74e605ad968eba
       path: modules/msgs/zmk-studio-messages
       remote: sukumar
   group-filter: [+optional]
