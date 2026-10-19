@@ -44,6 +44,7 @@ menuconfig ZMK_STUDIO_RPC
     select RING_BUFFER
     select ZMK_KEYMAP_SETTINGS_STORAGE
     select ZMK_KEYMAP_LAYER_REORDERING
+    imply ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING if ZMK_SPLIT_BLE && ZMK_SPLIT_ROLE_CENTRAL
     help
       Add firmware support for studio RPC protocol
 
@@ -108,6 +109,14 @@ config ZMK_STUDIO_RPC_RX_BUF_SIZE
 config ZMK_STUDIO_RPC_TX_BUF_SIZE
     int "TX Buffer Size"
     default 64
+
+config ZMK_STUDIO_STATUS_DONGLE_BATTERY
+    bool "Report central/dongle battery in Studio status"
+    default n
+    help
+      Report the central controller battery in the live Studio status payload.
+      Leave this disabled for USB-only dongles, whose battery ADC can otherwise
+      look like a phantom full battery while powered from USB.
 
 endif
 
