@@ -25,6 +25,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/events/hid_indicators_changed.h>
 #include <zmk/events/layer_state_changed.h>
 #include <zmk/events/modifiers_state_changed.h>
+#include <zmk/events/position_state_changed.h>
 #include <zmk/events/split_peripheral_status_changed.h>
 #include <zmk/events/usb_conn_state_changed.h>
 #include <zmk/split/central.h>
@@ -104,6 +105,21 @@ static zmk_core_StatusOsMode studio_status_os_mode(void) {
     return zmk_core_StatusOsMode_ZMK_STUDIO_STATUS_OS_MODE_UNKNOWN;
 }
 #endif
+
+static zmk_core_StatusSnapshot last_status;
+static bool last_status_valid;
+
+static bool status_fields_equal(const zmk_core_StatusSnapshot *a,
+                                const zmk_core_StatusSnapshot *b) {
+    return a->active_layer == b->active_layer && a->modifiers == b->modifiers &&
+           a->transport == b->transport && a->ble_profile == b->ble_profile &&
+           a->connected == b->connected && a->usb_hid_ready == b->usb_hid_ready &&
+           a->ble_profile_connected == b->ble_profile_connected &&
+           a->ble_profile_bonded == b->ble_profile_bonded &&
+           a->hid_indicators == b->hid_indicators && a->left_battery == b->left_battery &&
+           a->right_battery == b->right_battery && a->dongle_battery == b->dongle_battery &&
+           a->os_mode == b->os_mode;
+}
 
 static zmk_core_StatusSnapshot get_status_snapshot(void) {
     zmk_core_StatusSnapshot status = zmk_core_StatusSnapshot_init_zero;
@@ -196,7 +212,10 @@ zmk_studio_Response reset_settings(const zmk_studio_Request *req) {
 
 zmk_studio_Response get_status(const zmk_studio_Request *req) {
     ARG_UNUSED(req);
-    return CORE_RESPONSE(get_status, get_status_snapshot());
+    zmk_core_StatusSnapshot status = get_status_snapshot();
+    last_status = status;
+    last_status_valid = true;
+    return CORE_RESPONSE(get_status, status);
 }
 
 ZMK_RPC_SUBSYSTEM_HANDLER(core, get_device_info, ZMK_STUDIO_RPC_HANDLER_UNSECURED);
@@ -220,7 +239,8 @@ static int core_event_mapper(const zmk_event_t *eh, zmk_studio_Notification *n) 
     const bool status_event =
         as_zmk_layer_state_changed(eh) || as_zmk_modifiers_state_changed(eh) ||
         as_zmk_endpoint_changed(eh) || as_zmk_hid_indicators_changed(eh) ||
-        as_zmk_usb_conn_state_changed(eh) || as_zmk_split_peripheral_status_changed(eh)
+        as_zmk_position_state_changed(eh) || as_zmk_usb_conn_state_changed(eh) ||
+        as_zmk_split_peripheral_status_changed(eh)
 #if IS_ENABLED(CONFIG_ZMK_BLE)
         || as_zmk_ble_active_profile_changed(eh)
 #endif
@@ -236,13 +256,21 @@ static int core_event_mapper(const zmk_event_t *eh, zmk_studio_Notification *n) 
         return -ENOTSUP;
     }
 
-    *n = ZMK_RPC_NOTIFICATION(core, status_changed, get_status_snapshot());
+    zmk_core_StatusSnapshot status = get_status_snapshot();
+    if (last_status_valid && status_fields_equal(&last_status, &status)) {
+        return -ENOTSUP;
+    }
+
+    last_status = status;
+    last_status_valid = true;
+    *n = ZMK_RPC_NOTIFICATION(core, status_changed, status);
     return 0;
 }
 
 ZMK_RPC_EVENT_MAPPER(core, core_event_mapper, zmk_studio_core_lock_state_changed,
                      zmk_layer_state_changed, zmk_modifiers_state_changed, zmk_endpoint_changed,
-                     zmk_hid_indicators_changed, zmk_usb_conn_state_changed,
+                     zmk_hid_indicators_changed, zmk_position_state_changed,
+                     zmk_usb_conn_state_changed,
                      zmk_split_peripheral_status_changed);
 
 #if IS_ENABLED(CONFIG_ZMK_BLE)
