@@ -16,19 +16,20 @@ struct stored_header {
 };
 #define UD_STORE_MAGIC 0x55444B31u
 
-static int load_cb(const char *name, size_t len, settings_read_cb read_cb, void *arg) {
-    struct ud_store *store = arg;
+static int load_cb(const char *name, size_t len, settings_read_cb read_cb,
+                   void *cb_arg, void *param) {
+    struct ud_store *store = param;
     const char *parts[2] = {"hana", "chocofi"};
     const char *kinds[4] = {"keymap", "combos", "behaviors", "layout_shift"};
     for (int b = 0; b < 2; b++) {
         for (int k = 0; k < 4; k++) {
             char key[64];
             (void)snprintf(key, sizeof(key), "universal/v1/%s/%s", parts[b], kinds[k]);
-            if (strcmp(key, name) != 0) continue;
+            if (strcmp(name, "") != 0 && strcmp(name, key) != 0) continue;
             if (len < sizeof(struct stored_header) ||
                 len > sizeof(struct stored_header) + UD_STORE_MAX_BYTES) return -EINVAL;
             uint8_t buf[sizeof(struct stored_header) + UD_STORE_MAX_BYTES];
-            int ret = read_cb(arg, buf, len);
+            int ret = read_cb(cb_arg, buf, len);
             if (ret < 0) return ret;
             if ((size_t)ret != len) return -EIO;
             struct stored_header h;
@@ -48,7 +49,7 @@ static int load_cb(const char *name, size_t len, settings_read_cb read_cb, void 
 int ud_settings_load(struct ud_store *store) {
     if (!store) return -EINVAL;
     ud_store_init(store);
-    /* Read keys independently; never enumerate or clear legacy keymap/* keys. */
+    /* Read independent keys, without clearing legacy settings. */
     const char *parts[2] = {"hana", "chocofi"};
     const char *kinds[4] = {"keymap", "combos", "behaviors", "layout_shift"};
     for (int b=0;b<2;b++) for(int k=0;k<4;k++) {
