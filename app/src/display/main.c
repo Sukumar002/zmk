@@ -119,9 +119,7 @@ void zmk_display_set_manual_power(bool on) {
     }
 }
 
-void zmk_display_toggle_manual_power(void) {
-    zmk_display_set_manual_power(manual_display_off);
-}
+void zmk_display_toggle_manual_power(void) { zmk_display_set_manual_power(manual_display_off); }
 
 static void initialize_theme() {
 #if IS_ENABLED(CONFIG_LV_USE_THEME_MONO)
