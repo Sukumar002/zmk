@@ -775,4 +775,11 @@ osource "$(ZMK_CONFIG)/boards/shields/*/Kconfig.shield"
 # This loads ZMK's sensible defaults
 rsource "Kconfig.defaults"
 
+config ZMK_UNIVERSAL_STORE_EXPERIMENT
+    bool "Compile isolated universal dongle persistent settings adapter"
+    default n
+    depends on SETTINGS
+    help
+      Experimental adapter only; no automatic writes or keymap switching.
+
 source "Kconfig.zephyr"
