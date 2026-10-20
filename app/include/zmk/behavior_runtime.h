@@ -111,20 +111,20 @@ struct zmk_behavior_runtime_slot {
 /** Register a pool slot into the iterable section walked by the Studio subsystem.
  * Allocates the slot's mutable RAM state (claimed flag + name) alongside it.
  * `_default_active` / `_default_name` mark a FACTORY slot (M12). */
-#define ZMK_BEHAVIOR_RUNTIME_SLOT_DEFINE_SEEDED(name, _dev, _config, _desc, _default_active,        \
-                                                _default_name)                                      \
+#define ZMK_BEHAVIOR_RUNTIME_SLOT_DEFINE_SEEDED(name, _dev, _config, _desc, _default_active,       \
+                                                _default_name)                                     \
     static struct zmk_behavior_runtime_state name##_state = {0};                                   \
-    static const STRUCT_SECTION_ITERABLE(zmk_behavior_runtime_slot, name) = {                       \
-        .dev = (_dev),                                                                              \
-        .config = (_config),                                                                        \
-        .desc = (_desc),                                                                            \
-        .state = &name##_state,                                                                     \
-        .default_active = (_default_active),                                                        \
-        .default_name = (_default_name),                                                            \
+    static const STRUCT_SECTION_ITERABLE(zmk_behavior_runtime_slot, name) = {                      \
+        .dev = (_dev),                                                                             \
+        .config = (_config),                                                                       \
+        .desc = (_desc),                                                                           \
+        .state = &name##_state,                                                                    \
+        .default_active = (_default_active),                                                       \
+        .default_name = (_default_name),                                                           \
     }
 
 /** Register a plain (non-factory) pool slot. */
-#define ZMK_BEHAVIOR_RUNTIME_SLOT_DEFINE(name, _dev, _config, _desc)                                \
+#define ZMK_BEHAVIOR_RUNTIME_SLOT_DEFINE(name, _dev, _config, _desc)                               \
     ZMK_BEHAVIOR_RUNTIME_SLOT_DEFINE_SEEDED(name, _dev, _config, _desc, false, NULL)
 
 /**
