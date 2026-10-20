@@ -17,7 +17,8 @@ int main(void) {
     assert(ud_store_write(&s, UD_STORE_CHOCOFI, UD_STORE_KEYMAP, 0, chocofi, sizeof(chocofi)) ==
            UD_STORE_OK);
     assert(!strcmp((const char *)ud_store_read(&s, UD_STORE_HANA, UD_STORE_KEYMAP)->data, hana));
-    assert(!strcmp((const char *)ud_store_read(&s, UD_STORE_CHOCOFI, UD_STORE_KEYMAP)->data, chocofi));
+    assert(
+        !strcmp((const char *)ud_store_read(&s, UD_STORE_CHOCOFI, UD_STORE_KEYMAP)->data, chocofi));
     assert(ud_store_write(&s, UD_STORE_HANA, UD_STORE_KEYMAP, 0, "bad", 4) == UD_STORE_CONFLICT);
     assert(ud_store_write(&s, UD_STORE_CHOCOFI, UD_STORE_COMBOS, 0, "jk", 3) == UD_STORE_OK);
     assert(ud_store_read(&s, UD_STORE_HANA, UD_STORE_COMBOS)->length == 0);
