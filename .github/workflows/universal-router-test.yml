@@ -6,6 +6,8 @@ on:
       - 'app/include/zmk/universal_router.h'
       - 'app/src/universal_dongle/router.c'
       - 'tests/universal_dongle/**'
+      - 'app/include/zmk/universal_store.h'
+      - 'app/src/universal_dongle/store.c'
       - '.github/workflows/universal-router-test.yml'
   workflow_dispatch:
 jobs:
@@ -17,3 +19,8 @@ jobs:
         run: cc -std=c11 -Wall -Wextra -Werror -Iapp/include app/src/universal_dongle/router.c tests/universal_dongle/router_test.c -o /tmp/ud-router-test
       - name: Run routing test
         run: /tmp/ud-router-test
+      - name: Build strict isolation test
+        run: cc -std=c11 -Wall -Wextra -Werror -Iapp/include app/src/universal_dongle/store.c tests/universal_dongle/store_test.c -o /tmp/ud-store-test
+      - name: Run isolation test
+        run: /tmp/ud-store-test
+
