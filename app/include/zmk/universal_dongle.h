@@ -41,6 +41,5 @@ struct zmk_universal_switch_status {
  * - Implementations will be added in stages behind a default-off Kconfig.
  */
 int zmk_universal_request_switch(enum zmk_universal_board target);
-int zmk_universal_route_position(uint8_t peripheral_slot, uint32_t position,
-                                  bool pressed);
+int zmk_universal_route_position(uint8_t peripheral_slot, uint32_t position, bool pressed);
 int zmk_universal_get_switch_status(struct zmk_universal_switch_status *status);
