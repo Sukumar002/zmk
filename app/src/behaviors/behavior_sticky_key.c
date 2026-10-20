@@ -398,7 +398,8 @@ static int behavior_sticky_key_init(const struct device *dev) {
 
 // Built-in instance: config is const, lives in ROM.
 #define KP_INST_STD(n)                                                                             \
-    static const struct behavior_sticky_key_config behavior_sticky_key_config_##n = SK_CFG_INIT(n); \
+    static const struct behavior_sticky_key_config behavior_sticky_key_config_##n =                \
+        SK_CFG_INIT(n);                                                                            \
     BEHAVIOR_DT_INST_DEFINE(n, behavior_sticky_key_init, NULL, NULL,                               \
                             &behavior_sticky_key_config_##n, POST_KERNEL,                          \
                             CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &behavior_sticky_key_driver_api);
@@ -459,8 +460,7 @@ static const struct zmk_behavior_runtime_descriptor sk_descriptor = {
     ZMK_BEHAVIOR_RUNTIME_SLOT_DEFINE(zmk_rt_sk_slot_##n, DEVICE_DT_INST_GET(n),                    \
                                      &behavior_sticky_key_config_##n, &sk_descriptor);
 
-#define KP_INST(n)                                                                                 \
-    COND_CODE_1(DT_INST_PROP(n, runtime_editable), (KP_INST_RT(n)), (KP_INST_STD(n)))
+#define KP_INST(n) COND_CODE_1(DT_INST_PROP(n, runtime_editable), (KP_INST_RT(n)), (KP_INST_STD(n)))
 
 #else
 
