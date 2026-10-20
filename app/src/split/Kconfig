@@ -30,6 +30,13 @@ config ZMK_SPLIT_PERIPHERAL_HID_INDICATORS
     help
       Enable propagating the HID (LED) Indicator state to the split peripheral(s).
 
+config ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY
+    bool "Require universal dongle identity on split peripherals"
+    depends on ZMK_SPLIT_BLE && ZMK_SPLIT_ROLE_CENTRAL
+    help
+      Read and validate the versioned board-and-side identity characteristic before
+      accepting position notifications. Legacy or unrecognized peripherals fail closed.
+
 config ZMK_UNIVERSAL_DONGLE_PERIPHERAL_IDENTITY
     bool "Universal dongle peripheral identity"
     depends on ZMK_SPLIT_BLE && !ZMK_SPLIT_ROLE_CENTRAL
