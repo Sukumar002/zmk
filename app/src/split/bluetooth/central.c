@@ -62,6 +62,7 @@ struct peripheral_slot {
     uint16_t selected_physical_layout_handle;
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
     struct bt_gatt_read_params identity_read_params;
+    uint16_t identity_handle;
     bool identity_valid;
     uint8_t identity[3];
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
@@ -659,19 +660,22 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
             slot->discover_params.uuid = NULL;
             slot->discover_params.start_handle = attr->handle + 2;
             slot->run_behavior_handle = bt_gatt_attr_value_handle(attr);
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
         } else if (bt_uuid_cmp(
                        chrc_uuid, BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_UNIVERSAL_IDENTITY_UUID)) ==
                    0) {
             LOG_DBG("Found universal peripheral identity characteristic");
             slot->identity_valid = false;
+            slot->identity_handle = bt_gatt_attr_value_handle(attr);
             slot->identity_read_params.func = split_central_identity_read_func;
             slot->identity_read_params.handle_count = 1;
-            slot->identity_read_params.single.handle = bt_gatt_attr_value_handle(attr);
+            slot->identity_read_params.single.handle = slot->identity_handle;
             slot->identity_read_params.single.offset = 0;
             int identity_err = bt_gatt_read(conn, &slot->identity_read_params);
             if (identity_err) {
                 LOG_WRN("Failed to read universal peripheral identity (%d)", identity_err);
             }
+#endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
         } else if (!bt_uuid_cmp(((struct bt_gatt_chrc *)attr->user_data)->uuid,
                                 BT_UUID_DECLARE_128(ZMK_SPLIT_BT_SELECT_PHYS_LAYOUT_UUID))) {
             LOG_DBG("Found select physical layout handle");
@@ -750,6 +754,9 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
 
     bool subscribed = slot->run_behavior_handle && slot->subscribe_params.value_handle &&
                       slot->selected_physical_layout_handle;
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    subscribed = subscribed && slot->identity_handle;
+#endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
 
 #if ZMK_KEYMAP_HAS_SENSORS
     subscribed = subscribed && slot->sensor_subscribe_params.value_handle;
