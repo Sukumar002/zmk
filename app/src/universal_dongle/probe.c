@@ -6,11 +6,18 @@
 #include <zephyr/settings/settings.h>
 #include <zmk/universal_settings.h>
 #include <zmk/universal_store.h>
+#include <zmk/universal_router.h>
 
 LOG_MODULE_REGISTER(ud_probe, LOG_LEVEL_INF);
 static struct ud_store scoped_config;
+static struct ud_router routing_probe;
 
 static int universal_storage_probe(void) {
+    ud_init(&routing_probe, UD_CHOCOFI);
+    (void)ud_assign(&routing_probe, 0, UD_HANA, UD_LEFT);
+    (void)ud_assign(&routing_probe, 1, UD_HANA, UD_RIGHT);
+    (void)ud_assign(&routing_probe, 2, UD_CHOCOFI, UD_LEFT);
+    (void)ud_assign(&routing_probe, 3, UD_CHOCOFI, UD_RIGHT);
     int ret = ud_settings_load(&scoped_config);
     if (ret) {
         LOG_WRN("Universal settings read-only probe returned %d", ret);
