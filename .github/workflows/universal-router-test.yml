@@ -1,0 +1,19 @@
+name: Universal dongle routing unit tests
+on:
+  push:
+    branches: [experiment/universal-dongle]
+    paths:
+      - 'app/include/zmk/universal_router.h'
+      - 'app/src/universal_dongle/router.c'
+      - 'tests/universal_dongle/**'
+      - '.github/workflows/universal-router-test.yml'
+  workflow_dispatch:
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build strict host test
+        run: cc -std=c11 -Wall -Wextra -Werror -Iapp/include app/src/universal_dongle/router.c tests/universal_dongle/router_test.c -o /tmp/ud-router-test
+      - name: Run routing test
+        run: /tmp/ud-router-test
