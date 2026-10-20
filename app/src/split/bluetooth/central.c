@@ -193,6 +193,12 @@ int release_peripheral_slot(int index) {
         slot->conn = NULL;
     }
     slot->state = PERIPHERAL_SLOT_STATE_OPEN;
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    /* Never carry a prior connection's identity into a newly allocated slot. */
+    slot->identity_valid = false;
+    slot->identity_handle = 0;
+    memset(slot->identity, 0, sizeof(slot->identity));
+#endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
 
     // Raise events releasing any active positions from this peripheral
     for (int i = 0; i < POSITION_STATE_DATA_LEN; i++) {
@@ -397,6 +403,21 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
         LOG_WRN("Rejecting unsupported peripheral identity v%u board %u side %u", slot->identity[0],
                 slot->identity[1], slot->identity[2]);
         return BT_GATT_ITER_STOP;
+    }
+
+    /* Reject duplicate identities rather than ambiguously routing two links as one half. */
+    for (int i = 0; i < ZMK_SPLIT_BLE_PERIPHERAL_COUNT; i++) {
+        struct peripheral_slot *other = &peripherals[i];
+        if (other == slot || other->conn == NULL || !other->identity_valid) {
+            continue;
+        }
+        if (other->identity[1] == slot->identity[1] &&
+            other->identity[2] == slot->identity[2]) {
+            LOG_WRN("Rejecting duplicate universal identity: board %u side %u",
+                    slot->identity[1], slot->identity[2]);
+            bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+            return BT_GATT_ITER_STOP;
+        }
     }
 
     slot->identity_valid = true;
