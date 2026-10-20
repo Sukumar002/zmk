@@ -989,23 +989,21 @@ static int32_t ht_rt_positions_len(const int32_t *positions) {
 // overwrites both either way.
 #define KP_INST_RT(n)                                                                              \
     static struct behavior_hold_tap_config behavior_hold_tap_config_##n = HT_CFG_INIT(n);          \
-    static int behavior_hold_tap_rt_init_##n(const struct device *dev) {                            \
-        behavior_hold_tap_config_##n.hold_trigger_key_positions_len = COND_CODE_1(                  \
-            DT_INST_PROP(n, runtime_default_active),                                                \
-            (ht_rt_positions_len(behavior_hold_tap_config_##n.hold_trigger_key_positions)), (0));   \
-        return behavior_hold_tap_init(dev);                                                         \
+    static int behavior_hold_tap_rt_init_##n(const struct device *dev) {                           \
+        behavior_hold_tap_config_##n.hold_trigger_key_positions_len = COND_CODE_1(                 \
+            DT_INST_PROP(n, runtime_default_active),                                               \
+            (ht_rt_positions_len(behavior_hold_tap_config_##n.hold_trigger_key_positions)), (0));  \
+        return behavior_hold_tap_init(dev);                                                        \
     }                                                                                              \
     static struct behavior_hold_tap_data behavior_hold_tap_data_##n = {};                          \
-    BEHAVIOR_DT_INST_DEFINE(n, behavior_hold_tap_rt_init_##n, NULL, &behavior_hold_tap_data_##n,    \
-                            &behavior_hold_tap_config_##n, POST_KERNEL,                             \
-                            CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &behavior_hold_tap_driver_api);    \
-    ZMK_BEHAVIOR_RUNTIME_SLOT_DEFINE_SEEDED(zmk_rt_slot_##n, DEVICE_DT_INST_GET(n),                 \
-                                            &behavior_hold_tap_config_##n, &ht_descriptor,          \
-                                            DT_INST_PROP(n, runtime_default_active),                \
-                                            DT_INST_PROP_OR(n, display_name, ""));
+    BEHAVIOR_DT_INST_DEFINE(n, behavior_hold_tap_rt_init_##n, NULL, &behavior_hold_tap_data_##n,   \
+                            &behavior_hold_tap_config_##n, POST_KERNEL,                            \
+                            CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &behavior_hold_tap_driver_api);   \
+    ZMK_BEHAVIOR_RUNTIME_SLOT_DEFINE_SEEDED(                                                       \
+        zmk_rt_slot_##n, DEVICE_DT_INST_GET(n), &behavior_hold_tap_config_##n, &ht_descriptor,     \
+        DT_INST_PROP(n, runtime_default_active), DT_INST_PROP_OR(n, display_name, ""));
 
-#define KP_INST(n)                                                                                 \
-    COND_CODE_1(DT_INST_PROP(n, runtime_editable), (KP_INST_RT(n)), (KP_INST_STD(n)))
+#define KP_INST(n) COND_CODE_1(DT_INST_PROP(n, runtime_editable), (KP_INST_RT(n)), (KP_INST_STD(n)))
 
 #else
 
