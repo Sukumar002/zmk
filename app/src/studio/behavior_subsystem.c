@@ -338,8 +338,7 @@ static void fill_config_field(zmk_behaviors_ConfigField *out,
 }
 
 // Encodes CustomBehavior.config — one ConfigField submessage per descriptor field.
-static bool encode_config_fields(pb_ostream_t *stream, const pb_field_t *field,
-                                 void *const *arg) {
+static bool encode_config_fields(pb_ostream_t *stream, const pb_field_t *field, void *const *arg) {
     const struct zmk_behavior_runtime_slot *slot = (const struct zmk_behavior_runtime_slot *)*arg;
 
     for (size_t i = 0; i < slot->desc->fields_len; i++) {
