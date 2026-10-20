@@ -778,8 +778,9 @@ rsource "Kconfig.defaults"
 config ZMK_UNIVERSAL_STORE_EXPERIMENT
     bool "Compile isolated universal dongle persistent settings adapter"
     default n
-    depends on SETTINGS
+    depends on ZMK_SPLIT_ROLE_CENTRAL && SETTINGS
     help
-      Experimental adapter only; no automatic writes or keymap switching.
+      Experimental central-only storage adapter for board-scoped records.
+      This does not enable live keyboard switching or Studio write routing.
 
 source "Kconfig.zephyr"
