@@ -144,3 +144,9 @@ if (CONFIG_ZMK_STUDIO_RPC)
 endif()
 
 zephyr_cc_option(-Wfatal-errors)
+
+# Universal dongle experiment: adapter is inert unless explicitly called.
+target_sources_ifdef(CONFIG_ZMK_UNIVERSAL_STORE_EXPERIMENT app PRIVATE
+    src/universal_dongle/store.c
+    src/universal_dongle/settings.c
+)
