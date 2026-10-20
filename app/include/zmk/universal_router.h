@@ -8,7 +8,12 @@ enum ud_switch_phase { UD_READY = 0, UD_DRAIN_OLD, UD_CONNECT_NEW };
 enum ud_result { UD_OK = 0, UD_IGNORED = 1, UD_INVALID = -1, UD_BUSY = -2 };
 #define UD_SLOTS 4
 #define UD_NO_SLOT 255
-struct ud_slot { uint8_t board; uint8_t side; bool assigned; bool connected; };
+struct ud_slot {
+    uint8_t board;
+    uint8_t side;
+    bool assigned;
+    bool connected;
+};
 struct ud_router {
     struct ud_slot slots[UD_SLOTS];
     enum ud_board active, pending, preferred;
