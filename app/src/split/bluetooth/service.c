@@ -52,6 +52,19 @@ static void split_svc_sensor_state_ccc(const struct bt_gatt_attr *attr, uint16_t
 #define POS_STATE_LEN 16
 
 static uint8_t num_of_positions = ZMK_KEYMAP_LEN;
+
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_PERIPHERAL_IDENTITY)
+/* Protocol v1: {version, board_id, side_id}; IDs are configured per half. */
+static const uint8_t universal_dongle_identity[] = {
+    1, CONFIG_ZMK_UNIVERSAL_DONGLE_BOARD_ID, CONFIG_ZMK_UNIVERSAL_DONGLE_SIDE_ID};
+
+static ssize_t split_svc_universal_identity(struct bt_conn *conn,
+                                            const struct bt_gatt_attr *attrs, void *buf,
+                                            uint16_t len, uint16_t offset) {
+    return bt_gatt_attr_read(conn, attrs, buf, len, offset, universal_dongle_identity,
+                             sizeof(universal_dongle_identity));
+}
+#endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_PERIPHERAL_IDENTITY) */
 static uint8_t position_state[POS_STATE_LEN];
 
 static struct zmk_split_run_behavior_payload behavior_run_payload;
@@ -205,7 +218,13 @@ BT_GATT_SERVICE_DEFINE(
                            BT_GATT_CHRC_WRITE | BT_GATT_CHRC_READ,
                            BT_GATT_PERM_WRITE_ENCRYPT | BT_GATT_PERM_READ_ENCRYPT,
                            split_svc_get_selected_phys_layout, split_svc_select_phys_layout,
-                           NULL), );
+                           NULL),
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_PERIPHERAL_IDENTITY)
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_UNIVERSAL_IDENTITY_UUID),
+                           BT_GATT_CHRC_READ, BT_GATT_PERM_READ_ENCRYPT,
+                           split_svc_universal_identity, NULL, NULL),
+#endif
+    );
 
 K_THREAD_STACK_DEFINE(service_q_stack, CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_STACK_SIZE);
 
