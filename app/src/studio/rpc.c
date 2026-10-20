@@ -222,9 +222,9 @@ static int send_response(const zmk_studio_Response *resp) {
 #if !IS_ENABLED(CONFIG_NANOPB_NO_ERRMSG)
         LOG_ERR("Failed to encode the message %s", stream.errmsg);
 #endif // !IS_ENABLED(CONFIG_NANOPB_NO_ERRMSG)
-        // Terminate the frame even though it's now garbage. Bailing out without an
-        // EOF left the client waiting on a response that could never complete;
-        // a short frame at least fails its decode, which the client can report.
+       // Terminate the frame even though it's now garbage. Bailing out without an
+       // EOF left the client waiting on a response that could never complete;
+       // a short frame at least fails its decode, which the client can report.
         put_framing_byte(FRAMING_EOF, true, user_data);
 
         // Returning straight out held rpc_transport_mutex for good. The RPC
