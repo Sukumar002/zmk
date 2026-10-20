@@ -394,14 +394,14 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
     memcpy(slot->identity, data, sizeof(slot->identity));
     if (slot->identity[0] != 1 || slot->identity[1] < 1 || slot->identity[1] > 2 ||
         slot->identity[2] < 1 || slot->identity[2] > 2) {
-        LOG_WRN("Rejecting unsupported peripheral identity v%u board %u side %u",
-                slot->identity[0], slot->identity[1], slot->identity[2]);
+        LOG_WRN("Rejecting unsupported peripheral identity v%u board %u side %u", slot->identity[0],
+                slot->identity[1], slot->identity[2]);
         return BT_GATT_ITER_STOP;
     }
 
     slot->identity_valid = true;
-    LOG_INF("Validated universal peripheral identity: board %u side %u",
-            slot->identity[1], slot->identity[2]);
+    LOG_INF("Validated universal peripheral identity: board %u side %u", slot->identity[1],
+            slot->identity[2]);
     return BT_GATT_ITER_STOP;
 }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
@@ -684,9 +684,8 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
             slot->discover_params.start_handle = attr->handle + 2;
             slot->run_behavior_handle = bt_gatt_attr_value_handle(attr);
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
-        } else if (bt_uuid_cmp(
-                       chrc_uuid, BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_UNIVERSAL_IDENTITY_UUID)) ==
-                   0) {
+        } else if (bt_uuid_cmp(chrc_uuid, BT_UUID_DECLARE_128(
+                                              ZMK_SPLIT_BT_CHAR_UNIVERSAL_IDENTITY_UUID)) == 0) {
             LOG_DBG("Found universal peripheral identity characteristic");
             slot->identity_valid = false;
             slot->identity_handle = bt_gatt_attr_value_handle(attr);
