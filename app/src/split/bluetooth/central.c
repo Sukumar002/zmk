@@ -279,6 +279,14 @@ static uint8_t split_central_sensor_notify_func(struct bt_conn *conn,
         return BT_GATT_ITER_STOP;
     }
 
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    struct peripheral_slot *identity_slot = peripheral_slot_for_conn(conn);
+    if (!identity_slot || !identity_slot->identity_valid) {
+        LOG_WRN("Ignoring sensor event from peripheral without validated identity");
+        return BT_GATT_ITER_CONTINUE;
+    }
+#endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
+
     LOG_DBG("[SENSOR NOTIFICATION] data %p length %u", data, length);
 
     if (length < offsetof(struct sensor_event, channel_data)) {
@@ -317,6 +325,14 @@ static uint8_t peripheral_input_event_notify_cb(struct bt_conn *conn,
         params->value_handle = 0U;
         return BT_GATT_ITER_STOP;
     }
+
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    struct peripheral_slot *identity_slot = peripheral_slot_for_conn(conn);
+    if (!identity_slot || !identity_slot->identity_valid) {
+        LOG_WRN("Ignoring input-split event from peripheral without validated identity");
+        return BT_GATT_ITER_CONTINUE;
+    }
+#endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
 
     LOG_DBG("[INPUT EVENT] data %p length %u", data, length);
 
@@ -591,6 +607,13 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
                                                  struct bt_gatt_discover_params *params) {
     if (!attr) {
         LOG_DBG("Discover complete");
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+        struct peripheral_slot *slot = peripheral_slot_for_conn(conn);
+        if (slot && !slot->identity_handle) {
+            LOG_WRN("Disconnecting split peripheral without universal identity protocol");
+            bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+        }
+#endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
         return BT_GATT_ITER_STOP;
     }
 
