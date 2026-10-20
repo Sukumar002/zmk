@@ -30,6 +30,29 @@ config ZMK_SPLIT_PERIPHERAL_HID_INDICATORS
     help
       Enable propagating the HID (LED) Indicator state to the split peripheral(s).
 
+config ZMK_UNIVERSAL_DONGLE_PERIPHERAL_IDENTITY
+    bool "Universal dongle peripheral identity"
+    depends on ZMK_SPLIT_BLE && !ZMK_SPLIT_ROLE_CENTRAL
+    help
+      Expose a versioned board-and-side identity characteristic for the experimental
+      universal dongle. Enable only on supported split peripherals and set both IDs.
+
+if ZMK_UNIVERSAL_DONGLE_PERIPHERAL_IDENTITY
+
+config ZMK_UNIVERSAL_DONGLE_BOARD_ID
+    int "Universal dongle board ID (1=Hana, 2=Chocofi)"
+    range 1 2
+    help
+      Stable board family identifier advertised by this split peripheral.
+
+config ZMK_UNIVERSAL_DONGLE_SIDE_ID
+    int "Universal dongle side ID (1=left, 2=right)"
+    range 1 2
+    help
+      Physical side identifier advertised by this split peripheral.
+
+endif # ZMK_UNIVERSAL_DONGLE_PERIPHERAL_IDENTITY
+
 endif # ZMK_SPLIT
 
 rsource "bluetooth/Kconfig"
