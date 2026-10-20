@@ -191,9 +191,8 @@ zmk_studio_Response add_combo(const zmk_studio_Request *req) {
     int ret = zmk_combos_add(&combo);
     if (ret < 0) {
         LOG_WRN("Adding combo failed with %d", ret);
-        resp.result.err = (ret == -ENOSPC)
-                              ? zmk_combos_AddComboErrorCode_ADD_COMBO_ERR_NO_SPACE
-                              : zmk_combos_AddComboErrorCode_ADD_COMBO_ERR_GENERIC;
+        resp.result.err = (ret == -ENOSPC) ? zmk_combos_AddComboErrorCode_ADD_COMBO_ERR_NO_SPACE
+                                           : zmk_combos_AddComboErrorCode_ADD_COMBO_ERR_GENERIC;
         return COMBOS_RESPONSE(add_combo, resp);
     }
 
