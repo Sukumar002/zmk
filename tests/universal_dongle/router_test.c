@@ -50,7 +50,7 @@ int main(void) {
     assert(ud_translate_position(UD_HANA, 46, &mapped) == UD_INVALID);
     assert(ud_translate_position(UD_CHOCOFI, 36, &mapped) == UD_INVALID);
     assert(ud_translate_position(UD_CHOCOFI, 0, NULL) == UD_INVALID);
-    assert(ud_translate_position((enum ud_board) -1, 0, &mapped) == UD_INVALID);
+    assert(ud_translate_position((enum ud_board) - 1, 0, &mapped) == UD_INVALID);
     bool seen[UD_HANA_POSITION_COUNT] = {false};
     for (uint32_t i = 0; i < UD_CHOCOFI_POSITION_COUNT; i++) {
         assert(ud_translate_position(UD_CHOCOFI, i, &mapped) == UD_OK);
