@@ -28,12 +28,12 @@ int main(void) {
     assert(ud_onboarding_confirm(&state, true) == UD_OK);
     assert(ud_onboarding_get_status(&state) == UD_ONBOARDING_READY);
 
-    /* A lost peripheral invalidates setup completion and requires confirmation again. */
+    /* Transient BLE loss must not erase completed onboarding or saved settings. */
     assert(ud_onboarding_set_discovered(&state, UD_ROLE_HANA_RIGHT, false) == UD_OK);
-    assert(ud_onboarding_get_status(&state) == UD_ONBOARDING_DISCOVERING);
-    assert(ud_onboarding_confirm(&state, true) == UD_BUSY);
+    assert(ud_onboarding_get_status(&state) == UD_ONBOARDING_READY);
+    assert(!ud_onboarding_pair_ready(&state, UD_HANA));
     assert(ud_onboarding_set_discovered(&state, UD_ROLE_HANA_RIGHT, true) == UD_OK);
-    assert(ud_onboarding_confirm(&state, true) == UD_OK);
+    assert(ud_onboarding_get_status(&state) == UD_ONBOARDING_READY);
 
     assert(ud_onboarding_set_discovered(&state, UD_ROLE_COUNT, true) == UD_INVALID);
     assert(ud_onboarding_role_discovered(NULL, UD_ROLE_HANA_LEFT) == false);
