@@ -426,8 +426,8 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
 
     slot->logical_slot = logical_slot;
     slot->identity_valid = true;
-    LOG_INF("Validated universal peripheral identity: board %u side %u (logical slot %u)", slot->identity[1],
-            slot->identity[2], slot->logical_slot);
+    LOG_INF("Validated universal peripheral identity: board %u side %u (logical slot %u)",
+            slot->identity[1], slot->identity[2], slot->logical_slot);
     return BT_GATT_ITER_STOP;
 }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
