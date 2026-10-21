@@ -1484,8 +1484,8 @@ void peripheral_event_work_callback(struct k_work *work) {
                                                          true, accepted);
             } else {
                 /* Releases pass only when the matching press was previously admitted. */
-                filter_result = ud_filter_position_event(&universal_router, UD_NO_SLOT,
-                                                         false, accepted);
+                filter_result =
+                    ud_filter_position_event(&universal_router, UD_NO_SLOT, false, accepted);
             }
             if (filter_result != UD_OK) {
                 continue;
