@@ -454,6 +454,11 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
 
     slot->logical_slot = logical_slot;
     slot->identity_valid = true;
+    if (universal_router.active == (enum ud_board)(slot->identity[1] - 1) &&
+        ud_connected_count(&universal_router, universal_router.active) == 2) {
+        /* Initial default pair is usable only when both identified halves are connected. */
+        universal_router.idle = false;
+    }
     LOG_INF("Validated universal peripheral identity: board %u side %u (logical slot %u, %u/4 discovered)",
             slot->identity[1], slot->identity[2], slot->logical_slot,
             ud_onboarding_discovered_count(&universal_onboarding));
