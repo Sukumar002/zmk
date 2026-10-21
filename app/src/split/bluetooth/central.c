@@ -150,6 +150,7 @@ static struct peripheral_slot peripherals[ZMK_SPLIT_BLE_PERIPHERAL_COUNT];
 /* These state models are keyed by validated logical identity, never BLE slot order. */
 static struct ud_router universal_router;
 static struct ud_onboarding universal_onboarding;
+K_MUTEX_DEFINE(universal_router_mutex);
 /* Per physical connection slot and key position: only admitted presses may release. */
 static bool universal_accepted_positions[ZMK_SPLIT_BLE_PERIPHERAL_COUNT]
                                         [POSITION_STATE_DATA_LEN * 8];
@@ -195,35 +196,64 @@ static int universal_find_profile_layer(enum ud_board board, zmk_keymap_layer_id
 static int universal_activate_profile_layer(enum ud_board board) {
     zmk_keymap_layer_id_t layer;
     int err = universal_find_profile_layer(board, &layer);
+    k_mutex_lock(&universal_router_mutex, K_FOREVER);
     if (err) {
-        universal_router.idle = true;
+        if (universal_router.phase == UD_READY && universal_router.active == board) {
+            universal_router.idle = true;
+        }
+        k_mutex_unlock(&universal_router_mutex);
         return err;
+    }
+
+    if (universal_router.phase != UD_READY || universal_router.active != board ||
+        ud_connected_count(&universal_router, board) != 2) {
+        k_mutex_unlock(&universal_router_mutex);
+        return -EAGAIN;
     }
 
     (void)zmk_keymap_layer_to(layer, false);
     universal_profile_layer_selected = true;
     universal_profile_layer_board = board;
+    universal_router.idle = false;
+    k_mutex_unlock(&universal_router_mutex);
     return 0;
 }
 
 /* Complete a requested switch only after every admitted press has been released. */
 static void universal_complete_switch_if_drained(void) {
-    if (universal_router.phase != UD_DRAIN_OLD || universal_any_accepted_positions()) {
+    if (universal_any_accepted_positions()) {
         return;
     }
 
+    k_mutex_lock(&universal_router_mutex, K_FOREVER);
+    if (universal_router.phase != UD_DRAIN_OLD) {
+        k_mutex_unlock(&universal_router_mutex);
+        return;
+    }
     enum ud_board target = universal_router.pending;
+    bool target_ready = ud_connected_count(&universal_router, target) == 2;
+    k_mutex_unlock(&universal_router_mutex);
+
     zmk_keymap_layer_id_t target_layer;
-    if (ud_connected_count(&universal_router, target) != 2 ||
-        universal_find_profile_layer(target, &target_layer) != 0) {
-        (void)ud_cancel_switch(&universal_router);
+    if (!target_ready || universal_find_profile_layer(target, &target_layer) != 0) {
+        k_mutex_lock(&universal_router_mutex, K_FOREVER);
+        if (universal_router.phase != UD_READY) {
+            (void)ud_cancel_switch(&universal_router);
+        }
+        k_mutex_unlock(&universal_router_mutex);
         LOG_WRN("Universal profile switch cancelled; target is not ready or has no keymap layer");
         return;
     }
 
-    if (ud_ack_released(&universal_router) != UD_OK ||
+    k_mutex_lock(&universal_router_mutex, K_FOREVER);
+    if (universal_router.phase != UD_DRAIN_OLD || universal_router.pending != target ||
+        universal_any_accepted_positions() || ud_connected_count(&universal_router, target) != 2 ||
+        ud_ack_released(&universal_router) != UD_OK ||
         ud_finish_switch(&universal_router) != UD_OK) {
-        (void)ud_cancel_switch(&universal_router);
+        if (universal_router.phase != UD_READY) {
+            (void)ud_cancel_switch(&universal_router);
+        }
+        k_mutex_unlock(&universal_router_mutex);
         LOG_WRN("Universal profile switch cancelled because the target pair is no longer ready");
         return;
     }
@@ -231,6 +261,7 @@ static void universal_complete_switch_if_drained(void) {
     (void)zmk_keymap_layer_to(target_layer, false);
     universal_profile_layer_selected = true;
     universal_profile_layer_board = target;
+    k_mutex_unlock(&universal_router_mutex);
     LOG_INF("Universal active keyboard changed to board %u", target);
 }
 #endif
@@ -517,21 +548,24 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
         }
     }
 
+    k_mutex_lock(&universal_router_mutex, K_FOREVER);
     int route_err =
         ud_assign(&universal_router, logical_slot, (enum ud_board)(slot->identity[1] - 1),
                   (enum ud_side)(slot->identity[2] - 1));
-    if (route_err != UD_OK) {
-        LOG_WRN("Rejecting identity because router assignment failed (%d)", route_err);
-        return BT_GATT_ITER_STOP;
+    if (route_err == UD_OK) {
+        route_err = ud_connected(&universal_router, logical_slot, true);
     }
-    route_err = ud_connected(&universal_router, logical_slot, true);
+    k_mutex_unlock(&universal_router_mutex);
     if (route_err != UD_OK) {
-        LOG_WRN("Rejecting identity because router connection state failed (%d)", route_err);
+        LOG_WRN("Rejecting universal identity because router assignment/connection failed (%d)",
+                route_err);
         return BT_GATT_ITER_STOP;
     }
     if (ud_onboarding_set_discovered(&universal_onboarding, logical_slot, true) != UD_OK) {
         LOG_WRN("Could not update onboarding state for logical slot %u", logical_slot);
+        k_mutex_lock(&universal_router_mutex, K_FOREVER);
         (void)ud_connected(&universal_router, logical_slot, false);
+        k_mutex_unlock(&universal_router_mutex);
         return BT_GATT_ITER_STOP;
     }
 
@@ -1199,13 +1233,15 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
     struct peripheral_slot *identity_slot = peripheral_slot_for_conn(conn);
     if (identity_slot && identity_slot->identity_valid) {
         uint8_t logical_slot = identity_slot->logical_slot;
+        k_mutex_lock(&universal_router_mutex, K_FOREVER);
         (void)ud_connected(&universal_router, logical_slot, false);
-        (void)ud_onboarding_set_discovered(&universal_onboarding, logical_slot, false);
         if ((enum ud_board)(identity_slot->identity[1] - 1) == universal_router.active &&
             ud_connected_count(&universal_router, universal_router.active) < 2) {
             /* Fail closed until a complete, safely selected pair is available. */
             universal_router.idle = true;
         }
+        k_mutex_unlock(&universal_router_mutex);
+        (void)ud_onboarding_set_discovered(&universal_onboarding, logical_slot, false);
         LOG_INF("Universal controller slot %u disconnected; %u/4 currently discovered",
                 logical_slot, ud_onboarding_discovered_count(&universal_onboarding));
     }
@@ -1561,11 +1597,13 @@ void peripheral_event_work_callback(struct k_work *work) {
 
             bool *accepted = &universal_accepted_positions[ev.source][position];
             bool pressed = ev.event.data.key_position_event.pressed;
-            bool was_accepted = *accepted;
             struct peripheral_slot *slot = &peripherals[ev.source];
+            k_mutex_lock(&universal_router_mutex, K_FOREVER);
+            bool was_accepted = *accepted;
             int filter_result;
             if (pressed) {
                 if (!slot->identity_valid) {
+                    k_mutex_unlock(&universal_router_mutex);
                     continue;
                 }
                 filter_result =
@@ -1576,6 +1614,7 @@ void peripheral_event_work_callback(struct k_work *work) {
                     ud_filter_position_event(&universal_router, UD_NO_SLOT, false, accepted);
             }
             if (filter_result != UD_OK) {
+                k_mutex_unlock(&universal_router_mutex);
                 continue;
             }
 
@@ -1591,15 +1630,18 @@ void peripheral_event_work_callback(struct k_work *work) {
                     *accepted = false;
                     LOG_WRN("Ignoring unmappable universal key position board %u position %u",
                             slot->identity[1], position);
+                    k_mutex_unlock(&universal_router_mutex);
                     continue;
                 }
                 universal_unified_positions[ev.source][position] = (uint8_t)unified_position;
             } else if (was_accepted) {
                 unified_position = universal_unified_positions[ev.source][position];
             } else {
+                k_mutex_unlock(&universal_router_mutex);
                 continue;
             }
             ev.event.data.key_position_event.position = unified_position;
+            k_mutex_unlock(&universal_router_mutex);
         }
 #endif
         LOG_DBG("Trigger key position state change of type %d", ev.event.type);
@@ -1607,23 +1649,34 @@ void peripheral_event_work_callback(struct k_work *work) {
     }
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
     /* Reconcile and switch only on this worker, after queued HID releases are sent. */
+    k_mutex_lock(&universal_router_mutex, K_FOREVER);
     if (universal_router.phase == UD_READY) {
         (void)ud_reconcile_availability(&universal_router);
     }
-    universal_complete_switch_if_drained();
+    enum ud_switch_phase phase = universal_router.phase;
+    k_mutex_unlock(&universal_router_mutex);
 
-    if (universal_router.phase == UD_READY) {
-        if (ud_connected_count(&universal_router, universal_router.active) == 2) {
-            if ((!universal_profile_layer_selected ||
-                 universal_profile_layer_board != universal_router.active) &&
-                universal_activate_profile_layer(universal_router.active) != 0) {
-                universal_router.idle = true;
-            } else {
-                universal_router.idle = false;
-            }
-        } else {
-            universal_router.idle = true;
-        }
+    if (phase == UD_DRAIN_OLD) {
+        universal_complete_switch_if_drained();
+    }
+
+    k_mutex_lock(&universal_router_mutex, K_FOREVER);
+    phase = universal_router.phase;
+    enum ud_board active_board = universal_router.active;
+    bool active_pair_ready = ud_connected_count(&universal_router, active_board) == 2;
+    if (phase == UD_READY && !active_pair_ready) {
+        universal_router.idle = true;
+    } else if (phase == UD_READY && universal_profile_layer_selected &&
+               universal_profile_layer_board == active_board) {
+        universal_router.idle = false;
+    }
+    bool need_layer_activation =
+        phase == UD_READY && active_pair_ready &&
+        (!universal_profile_layer_selected || universal_profile_layer_board != active_board);
+    k_mutex_unlock(&universal_router_mutex);
+
+    if (need_layer_activation) {
+        (void)universal_activate_profile_layer(active_board);
     }
 #endif
 }
