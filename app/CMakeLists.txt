@@ -104,7 +104,7 @@ target_sources_ifdef(CONFIG_ZMK_HID_INDICATORS app PRIVATE src/events/hid_indica
 add_subdirectory_ifdef(CONFIG_ZMK_HID_INDICATORS src/indicators)
 
 target_sources_ifdef(CONFIG_ZMK_SPLIT app PRIVATE src/events/split_peripheral_status_changed.c)
-target_sources_ifdef(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY app PRIVATE src/universal_dongle/router.c)
+target_sources_ifdef(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY app PRIVATE src/universal_dongle/router.c src/universal_dongle/onboarding.c)
 add_subdirectory_ifdef(CONFIG_ZMK_SPLIT src/split)
 
 target_sources_ifdef(CONFIG_USB_DEVICE_STACK app PRIVATE src/usb.c)
