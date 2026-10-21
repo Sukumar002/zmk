@@ -28,8 +28,8 @@ int main(void) {
     assert(cancelled_router.active == UD_HANA && cancelled_router.idle);
     assert(ud_cancel_switch(&cancelled_router) == UD_INVALID);
 
-    /* During a switch, a known disconnected identity may reconnect into its
-     * existing slot, but onboarding a new identity remains blocked. */
+    /* During a switch, known identities may reconnect and new identities may
+     * be onboarded. Position admission remains blocked until the transition ends. */
     struct ud_router reconnect_router;
     ud_init(&reconnect_router, UD_HANA);
     assert(ud_assign(&reconnect_router, 0, UD_HANA, UD_LEFT) == UD_OK);
@@ -37,7 +37,9 @@ int main(void) {
     assert(ud_connected(&reconnect_router, 0, false) == UD_OK);
     assert(ud_begin_switch(&reconnect_router, UD_CHOCOFI) == UD_OK);
     assert(ud_assign(&reconnect_router, 0, UD_HANA, UD_LEFT) == UD_OK);
-    assert(ud_assign(&reconnect_router, 1, UD_HANA, UD_RIGHT) == UD_BUSY);
+    assert(ud_assign(&reconnect_router, 1, UD_HANA, UD_RIGHT) == UD_OK);
+    assert(reconnect_router.phase == UD_DRAIN_OLD);
+    assert(ud_accept_position(&reconnect_router, 1) == UD_IGNORED);
 
     /* Protocol identities map to logical slots, never BLE connection order. */
     assert(ud_identity_to_slot(1, 1, 1) == 0); /* Hana left */
