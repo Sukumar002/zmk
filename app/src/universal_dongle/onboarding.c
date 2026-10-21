@@ -17,15 +17,14 @@ int ud_onboarding_set_discovered(struct ud_onboarding *state, uint8_t role, bool
     if (discovered) {
         state->discovered_mask |= (uint8_t)(1U << role);
     } else {
-        state->discovered_mask &= (uint8_t)~(1U << role);
+        state->discovered_mask &= (uint8_t) ~(1U << role);
         /* Keep setup confirmation across transient BLE disconnects. */
     }
     return UD_OK;
 }
 
 bool ud_onboarding_role_discovered(const struct ud_onboarding *state, uint8_t role) {
-    return state && role < UD_ROLE_COUNT &&
-           (state->discovered_mask & (uint8_t)(1U << role)) != 0;
+    return state && role < UD_ROLE_COUNT && (state->discovered_mask & (uint8_t)(1U << role)) != 0;
 }
 
 unsigned ud_onboarding_discovered_count(const struct ud_onboarding *state) {
@@ -66,8 +65,8 @@ enum ud_onboarding_status ud_onboarding_get_status(const struct ud_onboarding *s
         return UD_ONBOARDING_READY;
     }
     return ud_onboarding_discovered_count(state) == 0 && !state->setup_confirmed
-               ? UD_ONBOARDING_NEEDS_SETUP
-               : UD_ONBOARDING_DISCOVERING;
+              ? UD_ONBOARDING_NEEDS_SETUP
+              : UD_ONBOARDING_DISCOVERING;
 }
 
 int ud_onboarding_confirm(struct ud_onboarding *state, bool confirm) {
@@ -79,8 +78,7 @@ int ud_onboarding_confirm(struct ud_onboarding *state, bool confirm) {
         return UD_OK;
     }
     if (state->discovered_mask != ((1U << UD_ROLE_COUNT) - 1U) ||
-        !ud_onboarding_pair_ready(state, UD_HANA) ||
-        !ud_onboarding_pair_ready(state, UD_CHOCOFI)) {
+        !ud_onboarding_pair_ready(state, UD_HANA) || !ud_onboarding_pair_ready(state, UD_CHOCOFI)) {
         return UD_BUSY;
     }
     state->setup_confirmed = true;
