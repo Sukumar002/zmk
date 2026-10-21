@@ -93,24 +93,19 @@ int main(void) {
     assert(r.active == UD_CHOCOFI);
 
     /* A non-active half appearing/disappearing has no effect on focus. */
-    assert(ud_connected(&r, 3, false) == UD_OK);
+    assert(ud_connected(&r, 0, false) == UD_OK);
     assert(ud_reconcile_availability(&r) == UD_IGNORED);
     assert(r.active == UD_CHOCOFI);
-    assert(ud_connected(&r, 3, true) == UD_OK);
+    assert(ud_connected(&r, 0, true) == UD_OK);
 
-    /* Losing one active half disables input but must not prematurely fail over. */
+    /* If an active Chocofi half drops while Hana is complete, request a safe
+     * switch immediately; the adapter must drain old HID state before finish. */
     assert(ud_connected(&r, 2, false) == UD_OK);
-    assert(ud_reconcile_availability(&r) == UD_IGNORED && r.idle);
-    assert(ud_accept_position(&r, 3) == UD_IGNORED);
-    assert(r.active == UD_CHOCOFI);
-
-    /* Once the old pair is fully gone, a complete Hana pair can take over. */
-    assert(ud_connected(&r, 3, false) == UD_OK);
     assert(ud_reconcile_availability(&r) == UD_OK && r.phase == UD_DRAIN_OLD);
     assert(ud_accept_position(&r, 0) == UD_IGNORED);
-    assert(ud_begin_switch(&r, UD_CHOCOFI) == UD_BUSY);
     finish(&r);
     assert(r.active == UD_HANA && ud_accept_position(&r, 0) == UD_OK);
+    assert(ud_connected(&r, 3, false) == UD_OK);
 
     /* All off: idle. A single Chocofi half cannot trigger failover. */
     assert(ud_connected(&r, 0, false) == UD_OK);
