@@ -76,8 +76,11 @@ if ls $(pwd)/$testcase/peripheral*.overlay >/dev/null 2>&1; then
     extra_cmake_args="-DCONFIG_ZMK_SPLIT_ROLE_CENTRAL=y"
 fi
 
-west build -d build/$testcase -b nrf52_bsim//zmk_test_mock -- -DZMK_CONFIG="$(pwd)/$testcase" ${extra_cmake_args} > /dev/null 2>&1
-if [ $? -gt 0 ]; then
+build_dir="build/$testcase"
+mkdir -p "$build_dir"
+build_log="$build_dir/build.log"
+if ! west build -d "$build_dir" -b nrf52_bsim//zmk_test_mock -- -DZMK_CONFIG="$(pwd)/$testcase" ${extra_cmake_args} > "$build_log" 2>&1; then
+    cat "$build_log"
     echo "FAILED: $testcase did not build" | tee -a ./build/tests/pass-fail.log
     exit 1
 fi
