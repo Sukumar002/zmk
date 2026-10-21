@@ -927,12 +927,14 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
             if (bt_conn_get_security(conn) < BT_SECURITY_L2) {
                 int security_err = bt_conn_set_security(conn, BT_SECURITY_L2);
                 if (security_err && security_err != -EALREADY) {
-                    LOG_WRN("Failed to request encryption for universal identity (%d)", security_err);
+                    LOG_WRN("Failed to request encryption for universal identity (%d)",
+                            security_err);
                 }
             } else {
                 int identity_err = split_central_start_identity_read(conn, slot);
                 if (identity_err) {
-                    LOG_WRN("Failed to start universal peripheral identity read (%d)", identity_err);
+                    LOG_WRN("Failed to start universal peripheral identity read (%d)",
+                            identity_err);
                 }
             }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
