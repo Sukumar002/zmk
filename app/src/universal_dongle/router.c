@@ -7,9 +7,7 @@ static bool ud_valid_board(enum ud_board board) {
     return board >= UD_HANA && board < UD_BOARD_COUNT;
 }
 
-static bool ud_valid_side(enum ud_side side) {
-    return side >= UD_LEFT && side <= UD_RIGHT;
-}
+static bool ud_valid_side(enum ud_side side) { return side >= UD_LEFT && side <= UD_RIGHT; }
 
 static bool ud_board_ready(const struct ud_router *r, enum ud_board board) {
     if (!r || !ud_valid_board(board)) {
