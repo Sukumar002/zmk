@@ -185,6 +185,16 @@ int ud_finish_switch(struct ud_router *r) {
     return UD_OK;
 }
 
+int ud_cancel_switch(struct ud_router *r) {
+    if (!r || r->phase == UD_READY) {
+        return UD_INVALID;
+    }
+    r->pending = r->active;
+    r->phase = UD_READY;
+    r->idle = true;
+    return UD_OK;
+}
+
 int ud_reconcile_availability(struct ud_router *r) {
     if (!r) {
         return UD_INVALID;

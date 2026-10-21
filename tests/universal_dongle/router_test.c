@@ -17,6 +17,17 @@ int main(void) {
     assert(ud_find_slot(&r, UD_HANA, (enum ud_side) - 1) == UD_NO_SLOT);
     assert(ud_begin_switch(&r, (enum ud_board) - 1) == UD_INVALID);
 
+    /* A failed runtime profile activation aborts safely and keeps input idle. */
+    struct ud_router cancelled_router;
+    ud_init(&cancelled_router, UD_HANA);
+    assert(ud_assign(&cancelled_router, 0, UD_HANA, UD_LEFT) == UD_OK);
+    assert(ud_connected(&cancelled_router, 0, true) == UD_OK);
+    assert(ud_begin_switch(&cancelled_router, UD_CHOCOFI) == UD_OK);
+    assert(ud_cancel_switch(&cancelled_router) == UD_OK);
+    assert(cancelled_router.phase == UD_READY && cancelled_router.pending == UD_HANA);
+    assert(cancelled_router.active == UD_HANA && cancelled_router.idle);
+    assert(ud_cancel_switch(&cancelled_router) == UD_INVALID);
+
     /* During a switch, a known disconnected identity may reconnect into its
      * existing slot, but onboarding a new identity remains blocked. */
     struct ud_router reconnect_router;

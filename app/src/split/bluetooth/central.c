@@ -14,6 +14,7 @@
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/byteorder.h>
+#include <string.h>
 
 #include <zephyr/logging/log.h>
 
@@ -35,6 +36,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/physical_layouts.h>
 #include <zmk/universal_router.h>
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+#include <zmk/keymap.h>
 #include <zmk/universal_onboarding.h>
 #endif
 
@@ -155,6 +157,82 @@ static bool universal_accepted_positions[ZMK_SPLIT_BLE_PERIPHERAL_COUNT]
  * synthetic releases still release the same universal key after identity reset. */
 static uint8_t universal_unified_positions[ZMK_SPLIT_BLE_PERIPHERAL_COUNT]
                                           [POSITION_STATE_DATA_LEN * 8];
+static bool universal_profile_layer_selected;
+static enum ud_board universal_profile_layer_board = UD_HANA;
+
+static bool universal_any_accepted_positions(void) {
+    for (size_t source = 0; source < ARRAY_SIZE(universal_accepted_positions); source++) {
+        for (size_t position = 0; position < ARRAY_SIZE(universal_accepted_positions[source]);
+             position++) {
+            if (universal_accepted_positions[source][position]) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* The universal keymap provides full profile layers with these stable names. */
+static int universal_find_profile_layer(enum ud_board board, zmk_keymap_layer_id_t *layer) {
+    const char *wanted = board == UD_HANA ? "HANA_BASE" : "CHOCOFI_BASE";
+    if (!layer || (board != UD_HANA && board != UD_CHOCOFI)) {
+        return -EINVAL;
+    }
+
+    for (zmk_keymap_layer_index_t index = 0; index < ZMK_KEYMAP_LAYERS_LEN; index++) {
+        zmk_keymap_layer_id_t candidate = zmk_keymap_layer_index_to_id(index);
+        const char *name = zmk_keymap_layer_name(candidate);
+        if (name && strcmp(name, wanted) == 0) {
+            *layer = candidate;
+            return 0;
+        }
+    }
+
+    LOG_ERR("Universal keymap is missing required profile layer %s", wanted);
+    return -ENOENT;
+}
+
+static int universal_activate_profile_layer(enum ud_board board) {
+    zmk_keymap_layer_id_t layer;
+    int err = universal_find_profile_layer(board, &layer);
+    if (err) {
+        universal_router.idle = true;
+        return err;
+    }
+
+    (void)zmk_keymap_layer_to(layer, false);
+    universal_profile_layer_selected = true;
+    universal_profile_layer_board = board;
+    return 0;
+}
+
+/* Complete a requested switch only after every admitted press has been released. */
+static void universal_complete_switch_if_drained(void) {
+    if (universal_router.phase != UD_DRAIN_OLD || universal_any_accepted_positions()) {
+        return;
+    }
+
+    enum ud_board target = universal_router.pending;
+    zmk_keymap_layer_id_t target_layer;
+    if (ud_connected_count(&universal_router, target) != 2 ||
+        universal_find_profile_layer(target, &target_layer) != 0) {
+        (void)ud_cancel_switch(&universal_router);
+        LOG_WRN("Universal profile switch cancelled; target is not ready or has no keymap layer");
+        return;
+    }
+
+    if (ud_ack_released(&universal_router) != UD_OK ||
+        ud_finish_switch(&universal_router) != UD_OK) {
+        (void)ud_cancel_switch(&universal_router);
+        LOG_WRN("Universal profile switch cancelled because the target pair is no longer ready");
+        return;
+    }
+
+    (void)zmk_keymap_layer_to(target_layer, false);
+    universal_profile_layer_selected = true;
+    universal_profile_layer_board = target;
+    LOG_INF("Universal active keyboard changed to board %u", target);
+}
 #endif
 
 static bool is_scanning = false;
@@ -459,11 +537,24 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
 
     slot->logical_slot = logical_slot;
     slot->identity_valid = true;
-    if (universal_router.active == (enum ud_board)(slot->identity[1] - 1) &&
-        ud_connected_count(&universal_router, universal_router.active) == 2) {
-        /* Initial default pair is usable only when both identified halves are connected. */
-        universal_router.idle = false;
+
+    /* Preserve focus when the inactive board reconnects. Only select the current
+     * profile layer when needed, and fail closed if the universal keymap is absent. */
+    if (ud_connected_count(&universal_router, universal_router.active) == 2) {
+        if ((!universal_profile_layer_selected ||
+             universal_profile_layer_board != universal_router.active) &&
+            universal_activate_profile_layer(universal_router.active) != 0) {
+            universal_router.idle = true;
+        } else {
+            universal_router.idle = false;
+        }
+    } else {
+        int availability = ud_reconcile_availability(&universal_router);
+        if (availability == UD_OK) {
+            universal_complete_switch_if_drained();
+        }
     }
+
     LOG_INF("Validated universal peripheral identity: board %u side %u (logical slot %u, %u/4 "
             "discovered)",
             slot->identity[1], slot->identity[2], slot->logical_slot,
@@ -1158,6 +1249,14 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
         LOG_WRN("Failed to release peripheral slot (%d)", err);
     }
 
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    /* Reconcile only after disconnect releases have been queued. The switch helper
+     * waits for those admitted presses to drain before activating another profile. */
+    if (ud_reconcile_availability(&universal_router) == UD_OK) {
+        universal_complete_switch_if_drained();
+    }
+#endif
+
     k_work_submit(&notify_status_work);
 
     start_scanning();
@@ -1523,4 +1622,8 @@ void peripheral_event_work_callback(struct k_work *work) {
         LOG_DBG("Trigger key position state change of type %d", ev.event.type);
         zmk_split_transport_central_peripheral_event_handler(&bt_central, ev.source, ev.event);
     }
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    /* Synthetic disconnect releases are processed above; only now may focus move. */
+    universal_complete_switch_if_drained();
+#endif
 }
