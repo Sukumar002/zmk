@@ -38,7 +38,7 @@ int main(void) {
 
     assert(ud_onboarding_set_discovered(&state, UD_ROLE_COUNT, true) == UD_INVALID);
     assert(ud_onboarding_role_discovered(NULL, UD_ROLE_HANA_LEFT) == false);
-    assert(ud_onboarding_pair_ready(&state, (enum ud_board) -1) == false);
+    assert(ud_onboarding_pair_ready(&state, (enum ud_board) - 1) == false);
 
     /* Router event filter: active-pair presses and their matching releases only. */
     struct ud_router router;
