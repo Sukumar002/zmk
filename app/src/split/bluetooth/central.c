@@ -1462,6 +1462,36 @@ static int finish_init() {
 void peripheral_event_work_callback(struct k_work *work) {
     struct peripheral_event_wrapper ev;
     while (k_msgq_get(&peripheral_event_msgq, &ev, K_NO_WAIT) == 0) {
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+        if (ev.event.type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT) {
+            uint32_t position = ev.event.data.key_position_event.position;
+            if (ev.source >= ARRAY_SIZE(peripherals) ||
+                position >= POSITION_STATE_DATA_LEN * 8) {
+                LOG_WRN("Ignoring invalid universal key event source %u position %u",
+                        ev.source, position);
+                continue;
+            }
+
+            bool *accepted = &universal_accepted_positions[ev.source][position];
+            bool pressed = ev.event.data.key_position_event.pressed;
+            int filter_result;
+            if (pressed) {
+                struct peripheral_slot *slot = &peripherals[ev.source];
+                if (!slot->identity_valid) {
+                    continue;
+                }
+                filter_result = ud_filter_position_event(&universal_router, slot->logical_slot,
+                                                         true, accepted);
+            } else {
+                /* Releases pass only when the matching press was previously admitted. */
+                filter_result = ud_filter_position_event(&universal_router, UD_NO_SLOT,
+                                                         false, accepted);
+            }
+            if (filter_result != UD_OK) {
+                continue;
+            }
+        }
+#endif
         LOG_DBG("Trigger key position state change of type %d", ev.event.type);
         zmk_split_transport_central_peripheral_event_handler(&bt_central, ev.source, ev.event);
     }
