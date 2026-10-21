@@ -543,6 +543,7 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
         return BT_GATT_ITER_STOP;
     }
 
+    slot->identity_read_in_progress = false;
     if (err || !data) {
         if (err) {
             LOG_WRN("Universal identity read failed (%u); input remains blocked", err);
@@ -550,7 +551,6 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
         return BT_GATT_ITER_STOP;
     }
 
-    slot->identity_read_in_progress = false;
     slot->identity_valid = false;
     if (length != sizeof(slot->identity)) {
         LOG_WRN("Rejecting peripheral identity with invalid length %u", length);
