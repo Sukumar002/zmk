@@ -7,6 +7,8 @@ enum ud_side { UD_LEFT = 0, UD_RIGHT = 1 };
 enum ud_switch_phase { UD_READY = 0, UD_DRAIN_OLD, UD_CONNECT_NEW };
 enum ud_result { UD_OK = 0, UD_IGNORED = 1, UD_INVALID = -1, UD_BUSY = -2 };
 #define UD_SLOTS 4
+#define UD_HANA_POSITION_COUNT 46
+#define UD_CHOCOFI_POSITION_COUNT 36
 #define UD_NO_SLOT 255
 
 /* Protocol v1 uses 1-based board/side IDs. Return a stable logical identity
@@ -33,6 +35,10 @@ void ud_init(struct ud_router *r, enum ud_board initial);
 int ud_assign(struct ud_router *r, uint8_t slot, enum ud_board board, enum ud_side side);
 int ud_connected(struct ud_router *r, uint8_t slot, bool connected);
 int ud_accept_position(const struct ud_router *r, uint8_t slot);
+/* Translate each board's native row-major position index into the 46-position
+ * universal keymap. Hana is the reference layout; Chocofi's 36 positions map
+ * into the matching keys, leaving Hana-only positions unused. */
+int ud_translate_position(enum ud_board board, uint32_t source_position, uint32_t *unified_position);
 int ud_begin_switch(struct ud_router *r, enum ud_board target);
 int ud_ack_released(struct ud_router *r);
 int ud_finish_switch(struct ud_router *r);
