@@ -70,6 +70,7 @@ struct peripheral_slot {
     struct bt_gatt_read_params identity_read_params;
     uint16_t identity_handle;
     bool identity_valid;
+    bool identity_read_in_progress;
     uint8_t identity[3];
     uint8_t logical_slot;
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
@@ -352,6 +353,7 @@ int release_peripheral_slot(int index) {
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
     /* Never carry a prior connection's identity into a newly allocated slot. */
     slot->identity_valid = false;
+    slot->identity_read_in_progress = false;
     slot->logical_slot = UD_NO_SLOT;
     slot->identity_handle = 0;
     memset(slot->identity, 0, sizeof(slot->identity));
@@ -548,6 +550,7 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
         return BT_GATT_ITER_STOP;
     }
 
+    slot->identity_read_in_progress = false;
     slot->identity_valid = false;
     if (length != sizeof(slot->identity)) {
         LOG_WRN("Rejecting peripheral identity with invalid length %u", length);
@@ -610,6 +613,30 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
             slot->identity[1], slot->identity[2], slot->logical_slot,
             ud_onboarding_discovered_count(&universal_onboarding));
     return BT_GATT_ITER_STOP;
+}
+
+static int split_central_start_identity_read(struct bt_conn *conn, struct peripheral_slot *slot) {
+    if (!conn || !slot || !slot->identity_handle) {
+        return -EINVAL;
+    }
+    if (slot->identity_valid || slot->identity_read_in_progress) {
+        return 0;
+    }
+    /* The identity characteristic is READ_ENCRYPT: never issue the read before L2. */
+    if (bt_conn_get_security(conn) < BT_SECURITY_L2) {
+        return -EACCES;
+    }
+
+    slot->identity_read_params.func = split_central_identity_read_func;
+    slot->identity_read_params.handle_count = 1;
+    slot->identity_read_params.single.handle = slot->identity_handle;
+    slot->identity_read_params.single.offset = 0;
+    slot->identity_read_in_progress = true;
+    int err = bt_gatt_read(conn, &slot->identity_read_params);
+    if (err) {
+        slot->identity_read_in_progress = false;
+    }
+    return err;
 }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
 
@@ -895,14 +922,18 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
                                               ZMK_SPLIT_BT_CHAR_UNIVERSAL_IDENTITY_UUID)) == 0) {
             LOG_DBG("Found universal peripheral identity characteristic");
             slot->identity_valid = false;
+            slot->identity_read_in_progress = false;
             slot->identity_handle = bt_gatt_attr_value_handle(attr);
-            slot->identity_read_params.func = split_central_identity_read_func;
-            slot->identity_read_params.handle_count = 1;
-            slot->identity_read_params.single.handle = slot->identity_handle;
-            slot->identity_read_params.single.offset = 0;
-            int identity_err = bt_gatt_read(conn, &slot->identity_read_params);
-            if (identity_err) {
-                LOG_WRN("Failed to read universal peripheral identity (%d)", identity_err);
+            if (bt_conn_get_security(conn) < BT_SECURITY_L2) {
+                int security_err = bt_conn_set_security(conn, BT_SECURITY_L2);
+                if (security_err && security_err != -EALREADY) {
+                    LOG_WRN("Failed to request encryption for universal identity (%d)", security_err);
+                }
+            } else {
+                int identity_err = split_central_start_identity_read(conn, slot);
+                if (identity_err) {
+                    LOG_WRN("Failed to start universal peripheral identity read (%d)", identity_err);
+                }
             }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
         } else if (!bt_uuid_cmp(((struct bt_gatt_chrc *)attr->user_data)->uuid,
@@ -1108,6 +1139,7 @@ static bool split_central_eir_found(const bt_addr_le_t *addr) {
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
     /* A newly reserved BLE slot has no trusted logical identity yet. */
     slot->identity_valid = false;
+    slot->identity_read_in_progress = false;
     slot->logical_slot = UD_NO_SLOT;
     slot->identity_handle = 0;
     memset(slot->identity, 0, sizeof(slot->identity));
@@ -1250,6 +1282,14 @@ static void split_central_connected(struct bt_conn *conn, uint8_t conn_err) {
     LOG_DBG("Connected: %s", addr);
 
     confirm_peripheral_slot_conn(conn);
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    /* Identity is READ_ENCRYPT. Request L2 immediately; discovery/read may finish
+     * before or after encryption, so the read helper handles either ordering. */
+    int security_err = bt_conn_set_security(conn, BT_SECURITY_L2);
+    if (security_err && security_err != -EALREADY) {
+        LOG_WRN("Failed to request encryption for universal peripheral (%d)", security_err);
+    }
+#endif
     split_central_process_connection(conn);
     k_work_submit(&notify_status_work);
 }
@@ -1314,6 +1354,16 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
 static void split_central_security_changed(struct bt_conn *conn, bt_security_t level,
                                            enum bt_security_err err) {
     struct peripheral_slot *slot = peripheral_slot_for_conn(conn);
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    if (slot && err == 0 && level >= BT_SECURITY_L2 && slot->identity_handle &&
+        !slot->identity_valid && !slot->identity_read_in_progress) {
+        int identity_err = split_central_start_identity_read(conn, slot);
+        if (identity_err) {
+            LOG_WRN("Failed to start universal peripheral identity read after encryption (%d)",
+                    identity_err);
+        }
+    }
+#endif
     if (!slot || !slot->selected_physical_layout_handle) {
         return;
     }
