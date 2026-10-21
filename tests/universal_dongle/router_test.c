@@ -9,13 +9,24 @@ static void finish(struct ud_router *r) {
 
 int main(void) {
     struct ud_router r;
+    ud_init(&r, (enum ud_board)-1);
+    assert(r.idle && r.active == UD_HANA);
     ud_init(&r, UD_CHOCOFI);
     assert(r.idle && r.active == UD_CHOCOFI);
+    assert(ud_find_slot(&r, (enum ud_board)-1, UD_LEFT) == UD_NO_SLOT);
+    assert(ud_find_slot(&r, UD_HANA, (enum ud_side)-1) == UD_NO_SLOT);
+    assert(ud_begin_switch(&r, (enum ud_board)-1) == UD_INVALID);
     assert(ud_assign(&r, 0, UD_HANA, UD_LEFT) == UD_OK);
     assert(ud_assign(&r, 1, UD_HANA, UD_RIGHT) == UD_OK);
     assert(ud_assign(&r, 2, UD_CHOCOFI, UD_LEFT) == UD_OK);
     assert(ud_assign(&r, 3, UD_CHOCOFI, UD_RIGHT) == UD_OK);
     assert(ud_assign(&r, 1, UD_HANA, UD_LEFT) == UD_INVALID);
+    /* An assigned slot cannot be silently rebound to a different peer identity. */
+    assert(ud_assign(&r, 0, UD_CHOCOFI, UD_RIGHT) == UD_INVALID);
+    assert(ud_find_slot(&r, UD_HANA, UD_LEFT) == 0);
+    assert(ud_find_slot(&r, UD_CHOCOFI, UD_RIGHT) == 3);
+    assert(ud_assign(&r, 0, (enum ud_board)-1, UD_LEFT) == UD_INVALID);
+    assert(ud_assign(&r, 0, UD_HANA, (enum ud_side)-1) == UD_INVALID);
 
     /* One half must not make a keyboard active or trigger a switch. */
     assert(ud_reconcile_availability(&r) == UD_IGNORED && r.idle);
