@@ -80,6 +80,12 @@ int main(void) {
     assert(ud_finish_switch(&r) == UD_OK);
     assert(r.active == UD_HANA);
 
+    /* Return focus to Chocofi so the following checks prove that a healthy
+     * inactive Hana pair never steals focus merely by being connected. */
+    assert(ud_begin_switch(&r, UD_CHOCOFI) == UD_OK);
+    finish(&r);
+    assert(r.active == UD_CHOCOFI);
+
     /* Both Hana halves can connect without stealing focus. */
     assert(ud_connected(&r, 0, true) == UD_OK);
     assert(ud_connected(&r, 1, true) == UD_OK);
