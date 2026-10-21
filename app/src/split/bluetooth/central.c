@@ -924,6 +924,13 @@ static bool split_central_eir_found(const bt_addr_le_t *addr) {
         return false;
     }
     struct peripheral_slot *slot = &peripherals[slot_idx];
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    /* A newly reserved BLE slot has no trusted logical identity yet. */
+    slot->identity_valid = false;
+    slot->logical_slot = UD_NO_SLOT;
+    slot->identity_handle = 0;
+    memset(slot->identity, 0, sizeof(slot->identity));
+#endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
 
     // Stop scanning so we can connect to the peripheral device.
     int err = stop_scanning();
