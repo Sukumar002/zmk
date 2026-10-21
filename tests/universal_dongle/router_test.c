@@ -60,7 +60,13 @@ int main(void) {
     assert(ud_begin_switch(&r, UD_HANA) == UD_OK);
     assert(ud_filter_position_event(&r, 2, false, &accepted_key) == UD_OK);
     assert(!accepted_key);
-    finish(&r);
+    /* A release alone cannot complete a switch before the target pair is ready. */
+    assert(ud_ack_released(&r) == UD_OK);
+    assert(ud_finish_switch(&r) == UD_BUSY);
+    assert(r.active == UD_CHOCOFI);
+    assert(ud_connected(&r, 0, true) == UD_OK);
+    assert(ud_connected(&r, 1, true) == UD_OK);
+    assert(ud_finish_switch(&r) == UD_OK);
     assert(r.active == UD_HANA);
 
     /* Both Hana halves can connect without stealing focus. */
