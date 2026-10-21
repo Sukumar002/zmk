@@ -122,10 +122,10 @@ int ud_assign(struct ud_router *r, uint8_t slot, enum ud_board board, enum ud_si
     if (r->slots[slot].assigned) {
         return UD_OK;
     }
-    if (r->phase != UD_READY) {
-        return UD_BUSY;
-    }
-
+    /* Registering a stable identity is safe during a switch: input admission
+     * remains blocked by the phase until the old keys drain and a complete pair
+     * is selected. This also prevents a newly connecting fourth half from being
+     * stranded if it identifies itself during a profile transition. */
     r->slots[slot] =
         (struct ud_slot){.board = board, .side = side, .assigned = true, .connected = false};
     return UD_OK;
