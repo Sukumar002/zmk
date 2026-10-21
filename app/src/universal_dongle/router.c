@@ -160,16 +160,15 @@ int ud_reconcile_availability(struct ud_router *r) {
         return UD_IGNORED; /* Never steal focus when the active pair is ready. */
     }
 
-    /* A partial active pair is deliberately not enough to trigger failover. */
-    if (ud_connected_count(r, r->active) != 0) {
-        r->idle = true;
-        return UD_IGNORED;
-    }
-
+    /* Fail over whenever the active pair is unavailable and the other pair is
+     * complete. A single surviving half cannot safely run a split keymap; waiting
+     * for both active halves to disappear would leave the host unusable after a
+     * one-half disconnect or battery failure. The adapter must drain HID state
+     * before completing this transition. */
     if (ud_board_ready(r, other)) {
-        return ud_begin_switch(r, other); /* Caller must perform safe transition. */
+        return ud_begin_switch(r, other); /* Caller performs safe release + transition. */
     }
 
-    r->idle = true; /* No complete active pair; radio scanning is controlled by adapter. */
+    r->idle = true; /* Neither board is complete; adapter continues scanning. */
     return UD_IGNORED;
 }
