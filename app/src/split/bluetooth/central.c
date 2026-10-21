@@ -411,10 +411,9 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
         if (other == slot || other->conn == NULL || !other->identity_valid) {
             continue;
         }
-        if (other->identity[1] == slot->identity[1] &&
-            other->identity[2] == slot->identity[2]) {
-            LOG_WRN("Rejecting duplicate universal identity: board %u side %u",
-                    slot->identity[1], slot->identity[2]);
+        if (other->identity[1] == slot->identity[1] && other->identity[2] == slot->identity[2]) {
+            LOG_WRN("Rejecting duplicate universal identity: board %u side %u", slot->identity[1],
+                    slot->identity[2]);
             bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
             return BT_GATT_ITER_STOP;
         }

@@ -63,6 +63,7 @@ int zmk_split_transport_central_peripheral_event_handler(
         return raise_zmk_peripheral_battery_state_changed(battery_ev);
     }
 #endif
+#if IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)
     case ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_CHARGE_STATUS_EVENT: {
         struct zmk_peripheral_charge_state_changed charge_ev = {
             .source = source,
@@ -70,6 +71,7 @@ int zmk_split_transport_central_peripheral_event_handler(
         };
         return raise_zmk_peripheral_charge_state_changed(charge_ev);
     }
+#endif // IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)
     case ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_SENSOR_EVENT: {
         struct zmk_sensor_event sensor_ev = {.sensor_index = ev.data.sensor_event.sensor_index,
                                              .channel_data_size = 1,
