@@ -33,6 +33,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/pointing/input_split.h>
 #include <zmk/hid_indicators_types.h>
 #include <zmk/physical_layouts.h>
+#include <zmk/universal_router.h>
 
 static int start_scanning(void);
 
@@ -398,20 +399,22 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
     }
 
     memcpy(slot->identity, data, sizeof(slot->identity));
-    if (slot->identity[0] != 1 || slot->identity[1] < 1 || slot->identity[1] > 2 ||
-        slot->identity[2] < 1 || slot->identity[2] > 2) {
+    uint8_t logical_slot =
+        ud_identity_to_slot(slot->identity[0], slot->identity[1], slot->identity[2]);
+    if (logical_slot == UD_NO_SLOT) {
         LOG_WRN("Rejecting unsupported peripheral identity v%u board %u side %u", slot->identity[0],
                 slot->identity[1], slot->identity[2]);
         return BT_GATT_ITER_STOP;
     }
 
-    /* Reject duplicate identities rather than ambiguously routing two links as one half. */
+    /* Reject duplicate logical identities, independent of BLE connection order. */
     for (int i = 0; i < ZMK_SPLIT_BLE_PERIPHERAL_COUNT; i++) {
         struct peripheral_slot *other = &peripherals[i];
         if (other == slot || other->conn == NULL || !other->identity_valid) {
             continue;
         }
-        if (other->identity[1] == slot->identity[1] && other->identity[2] == slot->identity[2]) {
+        if (ud_identity_to_slot(other->identity[0], other->identity[1], other->identity[2]) ==
+            logical_slot) {
             LOG_WRN("Rejecting duplicate universal identity: board %u side %u", slot->identity[1],
                     slot->identity[2]);
             bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
