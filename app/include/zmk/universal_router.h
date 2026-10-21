@@ -38,6 +38,31 @@ int ud_ack_released(struct ud_router *r);
 int ud_finish_switch(struct ud_router *r);
 uint8_t ud_find_slot(const struct ud_router *r, enum ud_board board, enum ud_side side);
 unsigned ud_connected_count(const struct ud_router *r, enum ud_board board);
+/* Track whether a physical key press was admitted. Releases must be paired
+ * with an admitted press even if focus changes in between; an inactive board's
+ * release must never release a key owned by the active board. Caller keeps one
+ * accepted flag per source slot and physical position. */
+static inline int ud_filter_position_event(const struct ud_router *r, uint8_t slot, bool pressed,
+                                           bool *accepted) {
+    if (!accepted) {
+        return UD_INVALID;
+    }
+    if (pressed) {
+        if (*accepted) {
+            return UD_IGNORED;
+        }
+        if (ud_accept_position(r, slot) != UD_OK) {
+            return UD_IGNORED;
+        }
+        *accepted = true;
+        return UD_OK;
+    }
+    if (!*accepted) {
+        return UD_IGNORED;
+    }
+    *accepted = false;
+    return UD_OK;
+}
 /* Returns UD_OK if transition requested; UD_IGNORED if no change needed.
  * Caller performs HID release, BLE link policy and acknowledgements. */
 int ud_reconcile_availability(struct ud_router *r);
