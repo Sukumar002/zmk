@@ -265,6 +265,25 @@ static void universal_complete_switch_if_drained(void) {
     LOG_INF("Universal active keyboard changed to board %u", target);
 }
 
+#endif
+
+static bool is_scanning = false;
+
+static const struct bt_uuid_128 split_service_uuid = BT_UUID_INIT_128(ZMK_SPLIT_BT_SERVICE_UUID);
+
+struct peripheral_event_wrapper {
+    uint8_t source;
+    struct zmk_split_transport_peripheral_event event;
+};
+
+K_MSGQ_DEFINE(peripheral_event_msgq, sizeof(struct peripheral_event_wrapper),
+              CONFIG_ZMK_SPLIT_BLE_CENTRAL_POSITION_QUEUE_SIZE, 4);
+
+void peripheral_event_work_callback(struct k_work *work);
+
+K_WORK_DEFINE(peripheral_event_work, peripheral_event_work_callback);
+
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
 int zmk_universal_dongle_request_switch(enum ud_board target) {
     if (target < UD_HANA || target >= UD_BOARD_COUNT) {
         return UD_INVALID;
@@ -292,22 +311,6 @@ int zmk_universal_dongle_request_switch(enum ud_board target) {
     return result;
 }
 #endif
-
-static bool is_scanning = false;
-
-static const struct bt_uuid_128 split_service_uuid = BT_UUID_INIT_128(ZMK_SPLIT_BT_SERVICE_UUID);
-
-struct peripheral_event_wrapper {
-    uint8_t source;
-    struct zmk_split_transport_peripheral_event event;
-};
-
-K_MSGQ_DEFINE(peripheral_event_msgq, sizeof(struct peripheral_event_wrapper),
-              CONFIG_ZMK_SPLIT_BLE_CENTRAL_POSITION_QUEUE_SIZE, 4);
-
-void peripheral_event_work_callback(struct k_work *work);
-
-K_WORK_DEFINE(peripheral_event_work, peripheral_event_work_callback);
 
 int peripheral_slot_index_for_conn(struct bt_conn *conn) {
     for (int i = 0; i < ZMK_SPLIT_BLE_PERIPHERAL_COUNT; i++) {
