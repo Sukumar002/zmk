@@ -264,6 +264,33 @@ static void universal_complete_switch_if_drained(void) {
     k_mutex_unlock(&universal_router_mutex);
     LOG_INF("Universal active keyboard changed to board %u", target);
 }
+
+int zmk_universal_dongle_request_switch(enum ud_board target) {
+    if (target < UD_HANA || target >= UD_BOARD_COUNT) {
+        return UD_INVALID;
+    }
+
+    k_mutex_lock(&universal_router_mutex, K_FOREVER);
+    if (universal_router.phase != UD_READY) {
+        k_mutex_unlock(&universal_router_mutex);
+        return UD_BUSY;
+    }
+    if (target == universal_router.active) {
+        k_mutex_unlock(&universal_router_mutex);
+        return UD_IGNORED;
+    }
+    if (ud_connected_count(&universal_router, target) != 2) {
+        k_mutex_unlock(&universal_router_mutex);
+        return UD_BUSY;
+    }
+
+    int result = ud_begin_switch(&universal_router, target);
+    k_mutex_unlock(&universal_router_mutex);
+    if (result == UD_OK) {
+        k_work_submit(&peripheral_event_work);
+    }
+    return result;
+}
 #endif
 
 static bool is_scanning = false;

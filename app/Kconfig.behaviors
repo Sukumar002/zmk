@@ -7,6 +7,14 @@ config ZMK_BEHAVIOR_METADATA
       Enabling this option adds APIs for documenting and fetching
       metadata describing a behaviors name, and supported parameters.
 
+config ZMK_BEHAVIOR_UNIVERSAL_DONGLE_SWITCH
+    bool "Universal dongle profile-switch behavior"
+    default n
+    depends on ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY
+    help
+      Enables a behavior that requests a switch to the other identified keyboard.
+      The central drains admitted key presses before changing the active profile.
+
 config ZMK_BEHAVIOR_LOCAL_IDS
     bool "Local IDs"
 

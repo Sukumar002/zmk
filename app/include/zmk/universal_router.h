@@ -45,6 +45,9 @@ int ud_ack_released(struct ud_router *r);
 int ud_finish_switch(struct ud_router *r);
 /* Abort a pending switch and leave routing idle until a complete profile is usable. */
 int ud_cancel_switch(struct ud_router *r);
+
+/* Request a profile switch from a behavior; completion is deferred until HID is drained. */
+int zmk_universal_dongle_request_switch(enum ud_board target);
 uint8_t ud_find_slot(const struct ud_router *r, enum ud_board board, enum ud_side side);
 unsigned ud_connected_count(const struct ud_router *r, enum ud_board board);
 /* Track whether a physical key press was admitted. Releases must be paired
