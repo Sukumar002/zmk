@@ -16,6 +16,17 @@ int main(void) {
     assert(ud_find_slot(&r, (enum ud_board) - 1, UD_LEFT) == UD_NO_SLOT);
     assert(ud_find_slot(&r, UD_HANA, (enum ud_side) - 1) == UD_NO_SLOT);
     assert(ud_begin_switch(&r, (enum ud_board) - 1) == UD_INVALID);
+
+    /* Protocol identities map to logical slots, never BLE connection order. */
+    assert(ud_identity_to_slot(1, 1, 1) == 0); /* Hana left */
+    assert(ud_identity_to_slot(1, 1, 2) == 1); /* Hana right */
+    assert(ud_identity_to_slot(1, 2, 1) == 2); /* Chocofi left */
+    assert(ud_identity_to_slot(1, 2, 2) == 3); /* Chocofi right */
+    assert(ud_identity_to_slot(2, 1, 1) == UD_NO_SLOT);
+    assert(ud_identity_to_slot(1, 0, 1) == UD_NO_SLOT);
+    assert(ud_identity_to_slot(1, 3, 1) == UD_NO_SLOT);
+    assert(ud_identity_to_slot(1, 1, 0) == UD_NO_SLOT);
+    assert(ud_identity_to_slot(1, 1, 3) == UD_NO_SLOT);
     assert(ud_assign(&r, 0, UD_HANA, UD_LEFT) == UD_OK);
     assert(ud_assign(&r, 1, UD_HANA, UD_RIGHT) == UD_OK);
     assert(ud_assign(&r, 2, UD_CHOCOFI, UD_LEFT) == UD_OK);
