@@ -438,7 +438,7 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
     int route_err =
         ud_assign(&universal_router, logical_slot, (enum ud_board)(slot->identity[1] - 1),
                   (enum ud_side)(slot->identity[2] - 1));
-    if (route_err != UD_OK && route_err != UD_BUSY) {
+    if (route_err != UD_OK) {
         LOG_WRN("Rejecting identity because router assignment failed (%d)", route_err);
         return BT_GATT_ITER_STOP;
     }
