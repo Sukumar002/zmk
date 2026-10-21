@@ -61,11 +61,13 @@ enum ud_onboarding_status ud_onboarding_get_status(const struct ud_onboarding *s
     if (!state) {
         return UD_ONBOARDING_INVALID;
     }
-    if (state->setup_confirmed) {
+    if (state->setup_confirmed &&
+        state->discovered_mask == ((1U << UD_ROLE_COUNT) - 1U)) {
         return UD_ONBOARDING_READY;
     }
-    return ud_onboarding_discovered_count(state) == 0 ? UD_ONBOARDING_NEEDS_SETUP
-                                                       : UD_ONBOARDING_DISCOVERING;
+    return ud_onboarding_discovered_count(state) == 0 && !state->setup_confirmed
+               ? UD_ONBOARDING_NEEDS_SETUP
+               : UD_ONBOARDING_DISCOVERING;
 }
 
 int ud_onboarding_confirm(struct ud_onboarding *state, bool confirm) {
