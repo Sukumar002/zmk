@@ -66,6 +66,7 @@ struct peripheral_slot {
     uint16_t identity_handle;
     bool identity_valid;
     uint8_t identity[3];
+    uint8_t logical_slot;
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
     uint8_t position_state[POSITION_STATE_DATA_LEN];
     uint8_t changed_positions[POSITION_STATE_DATA_LEN];
@@ -197,6 +198,7 @@ int release_peripheral_slot(int index) {
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
     /* Never carry a prior connection's identity into a newly allocated slot. */
     slot->identity_valid = false;
+    slot->logical_slot = UD_NO_SLOT;
     slot->identity_handle = 0;
     memset(slot->identity, 0, sizeof(slot->identity));
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
@@ -422,9 +424,10 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
         }
     }
 
+    slot->logical_slot = logical_slot;
     slot->identity_valid = true;
-    LOG_INF("Validated universal peripheral identity: board %u side %u", slot->identity[1],
-            slot->identity[2]);
+    LOG_INF("Validated universal peripheral identity: board %u side %u (logical slot %u)", slot->identity[1],
+            slot->identity[2], slot->logical_slot);
     return BT_GATT_ITER_STOP;
 }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
