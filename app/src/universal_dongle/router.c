@@ -3,8 +3,16 @@
 #include <stddef.h>
 #include <string.h>
 
+static bool ud_valid_board(enum ud_board board) {
+    return board >= UD_HANA && board < UD_BOARD_COUNT;
+}
+
+static bool ud_valid_side(enum ud_side side) {
+    return side >= UD_LEFT && side <= UD_RIGHT;
+}
+
 static bool ud_board_ready(const struct ud_router *r, enum ud_board board) {
-    if (!r || board >= UD_BOARD_COUNT) {
+    if (!r || !ud_valid_board(board)) {
         return false;
     }
 
@@ -30,13 +38,13 @@ void ud_init(struct ud_router *r, enum ud_board initial) {
         return;
     }
     memset(r, 0, sizeof(*r));
-    r->active = initial < UD_BOARD_COUNT ? initial : UD_HANA;
+    r->active = ud_valid_board(initial) ? initial : UD_HANA;
     r->preferred = r->pending = r->active;
     r->idle = true;
 }
 
 uint8_t ud_find_slot(const struct ud_router *r, enum ud_board board, enum ud_side side) {
-    if (!r) {
+    if (!r || !ud_valid_board(board) || !ud_valid_side(side)) {
         return UD_NO_SLOT;
     }
     for (uint8_t i = 0; i < UD_SLOTS; i++) {
@@ -48,7 +56,7 @@ uint8_t ud_find_slot(const struct ud_router *r, enum ud_board board, enum ud_sid
 }
 
 unsigned ud_connected_count(const struct ud_router *r, enum ud_board board) {
-    if (!r || board >= UD_BOARD_COUNT) {
+    if (!r || !ud_valid_board(board)) {
         return 0;
     }
     unsigned n = 0;
@@ -61,12 +69,20 @@ unsigned ud_connected_count(const struct ud_router *r, enum ud_board board) {
 }
 
 int ud_assign(struct ud_router *r, uint8_t slot, enum ud_board board, enum ud_side side) {
-    if (!r || slot >= UD_SLOTS || board >= UD_BOARD_COUNT || side > UD_RIGHT) {
+    if (!r || slot >= UD_SLOTS || !ud_valid_board(board) || !ud_valid_side(side)) {
         return UD_INVALID;
     }
     if (r->phase != UD_READY) {
         return UD_BUSY;
     }
+
+    /* A slot is a persisted identity mapping, not a connection-order index.
+     * Rebinding an assigned slot could silently route a bonded peer as another board. */
+    if (r->slots[slot].assigned &&
+        (r->slots[slot].board != board || r->slots[slot].side != side)) {
+        return UD_INVALID;
+    }
+
     uint8_t old = ud_find_slot(r, board, side);
     if (old != UD_NO_SLOT && old != slot) {
         return UD_INVALID;
@@ -97,7 +113,7 @@ int ud_accept_position(const struct ud_router *r, uint8_t slot) {
 }
 
 int ud_begin_switch(struct ud_router *r, enum ud_board target) {
-    if (!r || target >= UD_BOARD_COUNT) {
+    if (!r || !ud_valid_board(target)) {
         return UD_INVALID;
     }
     if (r->phase != UD_READY) {
