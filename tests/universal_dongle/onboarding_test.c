@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <zmk/universal_onboarding.h>
+#include <zmk/universal_router.h>
 
 int main(void) {
     struct ud_onboarding state;
@@ -39,6 +40,29 @@ int main(void) {
     assert(ud_onboarding_role_discovered(NULL, UD_ROLE_HANA_LEFT) == false);
     assert(ud_onboarding_pair_ready(&state, (enum ud_board) -1) == false);
 
-    puts("universal dongle onboarding state tests passed");
+    /* Router event filter: active-pair presses and their matching releases only. */
+    struct ud_router router;
+    ud_init(&router, UD_HANA);
+    assert(ud_assign(&router, 0, UD_HANA, UD_LEFT) == UD_OK);
+    assert(ud_assign(&router, 1, UD_HANA, UD_RIGHT) == UD_OK);
+    assert(ud_assign(&router, 2, UD_CHOCOFI, UD_LEFT) == UD_OK);
+    assert(ud_assign(&router, 3, UD_CHOCOFI, UD_RIGHT) == UD_OK);
+    assert(ud_connected(&router, 0, true) == UD_OK);
+    assert(ud_connected(&router, 1, true) == UD_OK);
+    router.idle = false;
+    bool hana_key_accepted = false;
+    bool chocofi_key_accepted = false;
+    assert(ud_filter_position_event(&router, 0, true, &hana_key_accepted) == UD_OK);
+    assert(hana_key_accepted);
+    assert(ud_filter_position_event(&router, 2, true, &chocofi_key_accepted) == UD_IGNORED);
+    assert(!chocofi_key_accepted);
+    /* A previously admitted release is allowed even after routing becomes idle. */
+    router.idle = true;
+    assert(ud_filter_position_event(&router, UD_NO_SLOT, false, &hana_key_accepted) == UD_OK);
+    assert(!hana_key_accepted);
+    assert(ud_filter_position_event(&router, UD_NO_SLOT, false, &chocofi_key_accepted) ==
+           UD_IGNORED);
+
+    puts("universal dongle onboarding and routing tests passed");
     return 0;
 }
