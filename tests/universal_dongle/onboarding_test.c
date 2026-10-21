@@ -28,9 +28,9 @@ int main(void) {
     assert(ud_onboarding_confirm(&state, true) == UD_OK);
     assert(ud_onboarding_get_status(&state) == UD_ONBOARDING_READY);
 
-    /* Transient BLE loss must not erase completed onboarding or saved settings. */
+    /* Transient BLE loss preserves confirmation but accurately reports missing hardware. */
     assert(ud_onboarding_set_discovered(&state, UD_ROLE_HANA_RIGHT, false) == UD_OK);
-    assert(ud_onboarding_get_status(&state) == UD_ONBOARDING_READY);
+    assert(ud_onboarding_get_status(&state) == UD_ONBOARDING_DISCOVERING);
     assert(!ud_onboarding_pair_ready(&state, UD_HANA));
     assert(ud_onboarding_set_discovered(&state, UD_ROLE_HANA_RIGHT, true) == UD_OK);
     assert(ud_onboarding_get_status(&state) == UD_ONBOARDING_READY);
