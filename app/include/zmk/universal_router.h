@@ -8,6 +8,16 @@ enum ud_switch_phase { UD_READY = 0, UD_DRAIN_OLD, UD_CONNECT_NEW };
 enum ud_result { UD_OK = 0, UD_IGNORED = 1, UD_INVALID = -1, UD_BUSY = -2 };
 #define UD_SLOTS 4
 #define UD_NO_SLOT 255
+
+/* Protocol v1 uses 1-based board/side IDs. Return a stable logical identity
+ * slot, independent of BLE connection order, or UD_NO_SLOT for invalid data. */
+static inline uint8_t ud_identity_to_slot(uint8_t version, uint8_t board_id, uint8_t side_id) {
+    if (version != 1 || board_id < 1 || board_id > UD_BOARD_COUNT || side_id < 1 ||
+        side_id > 2) {
+        return UD_NO_SLOT;
+    }
+    return (uint8_t)(((board_id - 1) * 2) + (side_id - 1));
+}
 struct ud_slot {
     uint8_t board;
     uint8_t side;
