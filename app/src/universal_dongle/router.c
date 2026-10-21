@@ -70,10 +70,6 @@ int ud_assign(struct ud_router *r, uint8_t slot, enum ud_board board, enum ud_si
     if (!r || slot >= UD_SLOTS || !ud_valid_board(board) || !ud_valid_side(side)) {
         return UD_INVALID;
     }
-    if (r->phase != UD_READY) {
-        return UD_BUSY;
-    }
-
     /* A slot is a persisted identity mapping, not a connection-order index.
      * Rebinding an assigned slot could silently route a bonded peer as another board. */
     if (r->slots[slot].assigned && (r->slots[slot].board != board || r->slots[slot].side != side)) {
@@ -87,6 +83,16 @@ int ud_assign(struct ud_router *r, uint8_t slot, enum ud_board board, enum ud_si
     if (r->slots[slot].connected) {
         return UD_BUSY;
     }
+
+    /* Reconnecting a previously assigned identity is safe during a switch:
+     * it restores the same persisted mapping and cannot introduce a new peer. */
+    if (r->slots[slot].assigned) {
+        return UD_OK;
+    }
+    if (r->phase != UD_READY) {
+        return UD_BUSY;
+    }
+
     r->slots[slot] =
         (struct ud_slot){.board = board, .side = side, .assigned = true, .connected = false};
     return UD_OK;
