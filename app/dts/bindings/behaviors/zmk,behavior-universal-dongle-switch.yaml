@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: MIT
+
+description: Request a switch to the other universal dongle keyboard profile
+
+compatible: "zmk,behavior-universal-dongle-switch"
+
+include: one_param.yaml
