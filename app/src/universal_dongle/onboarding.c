@@ -18,8 +18,7 @@ int ud_onboarding_set_discovered(struct ud_onboarding *state, uint8_t role, bool
         state->discovered_mask |= (uint8_t)(1U << role);
     } else {
         state->discovered_mask &= (uint8_t)~(1U << role);
-        /* A disconnect invalidates completion until the complete setup is available again. */
-        state->setup_confirmed = false;
+        /* Keep setup confirmation across transient BLE disconnects. */
     }
     return UD_OK;
 }
@@ -62,7 +61,7 @@ enum ud_onboarding_status ud_onboarding_get_status(const struct ud_onboarding *s
     if (!state) {
         return UD_ONBOARDING_INVALID;
     }
-    if (state->setup_confirmed && state->discovered_mask == ((1U << UD_ROLE_COUNT) - 1U)) {
+    if (state->setup_confirmed) {
         return UD_ONBOARDING_READY;
     }
     return ud_onboarding_discovered_count(state) == 0 ? UD_ONBOARDING_NEEDS_SETUP
