@@ -16,13 +16,12 @@ static bool ud_valid_side(enum ud_side side) { return side >= UD_LEFT && side <=
  * positions, and thumbs occupy the six inner thumb positions.
  */
 static const uint8_t chocofi_to_universal[UD_CHOCOFI_POSITION_COUNT] = {
-    1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
-    13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-    25, 26, 27, 28, 29, 32, 33, 34, 35, 36,
-    39, 40, 41, 43, 44, 45,
+    1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 13, 14, 15, 16, 17, 18, 19, 20,
+    21, 22, 25, 26, 27, 28, 29, 32, 33, 34, 35, 36, 39, 40, 41, 43, 44, 45,
 };
 
-int ud_translate_position(enum ud_board board, uint32_t source_position, uint32_t *unified_position) {
+int ud_translate_position(enum ud_board board, uint32_t source_position,
+                          uint32_t *unified_position) {
     if (!unified_position) {
         return UD_INVALID;
     }
