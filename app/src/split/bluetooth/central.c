@@ -149,7 +149,8 @@ static struct peripheral_slot peripherals[ZMK_SPLIT_BLE_PERIPHERAL_COUNT];
 static struct ud_router universal_router;
 static struct ud_onboarding universal_onboarding;
 /* Per physical connection slot and key position: only admitted presses may release. */
-static bool universal_accepted_positions[ZMK_SPLIT_BLE_PERIPHERAL_COUNT][POSITION_STATE_DATA_LEN * 8];
+static bool universal_accepted_positions[ZMK_SPLIT_BLE_PERIPHERAL_COUNT]
+                                        [POSITION_STATE_DATA_LEN * 8];
 #endif
 
 static bool is_scanning = false;
@@ -434,9 +435,9 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
         }
     }
 
-    int route_err = ud_assign(&universal_router, logical_slot,
-                              (enum ud_board)(slot->identity[1] - 1),
-                              (enum ud_side)(slot->identity[2] - 1));
+    int route_err =
+        ud_assign(&universal_router, logical_slot, (enum ud_board)(slot->identity[1] - 1),
+                  (enum ud_side)(slot->identity[2] - 1));
     if (route_err != UD_OK && route_err != UD_BUSY) {
         LOG_WRN("Rejecting identity because router assignment failed (%d)", route_err);
         return BT_GATT_ITER_STOP;
@@ -459,7 +460,8 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
         /* Initial default pair is usable only when both identified halves are connected. */
         universal_router.idle = false;
     }
-    LOG_INF("Validated universal peripheral identity: board %u side %u (logical slot %u, %u/4 discovered)",
+    LOG_INF("Validated universal peripheral identity: board %u side %u (logical slot %u, %u/4 "
+            "discovered)",
             slot->identity[1], slot->identity[2], slot->logical_slot,
             ud_onboarding_discovered_count(&universal_onboarding));
     return BT_GATT_ITER_STOP;
@@ -1465,10 +1467,9 @@ void peripheral_event_work_callback(struct k_work *work) {
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
         if (ev.event.type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT) {
             uint32_t position = ev.event.data.key_position_event.position;
-            if (ev.source >= ARRAY_SIZE(peripherals) ||
-                position >= POSITION_STATE_DATA_LEN * 8) {
-                LOG_WRN("Ignoring invalid universal key event source %u position %u",
-                        ev.source, position);
+            if (ev.source >= ARRAY_SIZE(peripherals) || position >= POSITION_STATE_DATA_LEN * 8) {
+                LOG_WRN("Ignoring invalid universal key event source %u position %u", ev.source,
+                        position);
                 continue;
             }
 
@@ -1480,8 +1481,8 @@ void peripheral_event_work_callback(struct k_work *work) {
                 if (!slot->identity_valid) {
                     continue;
                 }
-                filter_result = ud_filter_position_event(&universal_router, slot->logical_slot,
-                                                         true, accepted);
+                filter_result =
+                    ud_filter_position_event(&universal_router, slot->logical_slot, true, accepted);
             } else {
                 /* Releases pass only when the matching press was previously admitted. */
                 filter_result =
