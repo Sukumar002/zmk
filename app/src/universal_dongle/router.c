@@ -78,8 +78,7 @@ int ud_assign(struct ud_router *r, uint8_t slot, enum ud_board board, enum ud_si
 
     /* A slot is a persisted identity mapping, not a connection-order index.
      * Rebinding an assigned slot could silently route a bonded peer as another board. */
-    if (r->slots[slot].assigned &&
-        (r->slots[slot].board != board || r->slots[slot].side != side)) {
+    if (r->slots[slot].assigned && (r->slots[slot].board != board || r->slots[slot].side != side)) {
         return UD_INVALID;
     }
 
