@@ -1475,9 +1475,9 @@ void peripheral_event_work_callback(struct k_work *work) {
 
             bool *accepted = &universal_accepted_positions[ev.source][position];
             bool pressed = ev.event.data.key_position_event.pressed;
+            struct peripheral_slot *slot = &peripherals[ev.source];
             int filter_result;
             if (pressed) {
-                struct peripheral_slot *slot = &peripherals[ev.source];
                 if (!slot->identity_valid) {
                     continue;
                 }
@@ -1491,6 +1491,25 @@ void peripheral_event_work_callback(struct k_work *work) {
             if (filter_result != UD_OK) {
                 continue;
             }
+
+            /* The universal keymap uses Hana's 46-position matrix as its
+             * coordinate space. Translate Chocofi's native position before
+             * handing the event to ZMK's central event handler. Keep the
+             * accepted-position bitmap indexed by the source's native index. */
+            if (!slot->identity_valid) {
+                LOG_WRN("Ignoring key event from source %u without validated identity", ev.source);
+                continue;
+            }
+            uint32_t unified_position;
+            int translate_result =
+                ud_translate_position((enum ud_board)(slot->identity[1] - 1), position,
+                                      &unified_position);
+            if (translate_result != UD_OK) {
+                LOG_WRN("Ignoring unmappable universal key position board %u position %u",
+                        slot->identity[1], position);
+                continue;
+            }
+            ev.event.data.key_position_event.position = unified_position;
         }
 #endif
         LOG_DBG("Trigger key position state change of type %d", ev.event.type);
