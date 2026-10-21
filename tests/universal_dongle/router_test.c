@@ -48,6 +48,21 @@ int main(void) {
     assert(ud_reconcile_availability(&r) == UD_IGNORED && !r.idle);
     assert(ud_accept_position(&r, 2) == UD_OK);
 
+    /* Input filtering pairs only admitted presses with releases. */
+    bool accepted_key = false;
+    assert(ud_filter_position_event(&r, 2, false, &accepted_key) == UD_IGNORED);
+    assert(!accepted_key);
+    assert(ud_filter_position_event(&r, 2, true, &accepted_key) == UD_OK);
+    assert(accepted_key);
+    assert(ud_filter_position_event(&r, 2, true, &accepted_key) == UD_IGNORED);
+    assert(accepted_key);
+    /* Focus may change while held: the admitted release still gets through. */
+    assert(ud_begin_switch(&r, UD_HANA) == UD_OK);
+    assert(ud_filter_position_event(&r, 2, false, &accepted_key) == UD_OK);
+    assert(!accepted_key);
+    finish(&r);
+    assert(r.active == UD_HANA);
+
     /* Both Hana halves can connect without stealing focus. */
     assert(ud_connected(&r, 0, true) == UD_OK);
     assert(ud_connected(&r, 1, true) == UD_OK);
