@@ -17,6 +17,17 @@ int main(void) {
     assert(ud_find_slot(&r, UD_HANA, (enum ud_side) - 1) == UD_NO_SLOT);
     assert(ud_begin_switch(&r, (enum ud_board) - 1) == UD_INVALID);
 
+    /* During a switch, a known disconnected identity may reconnect into its
+     * existing slot, but onboarding a new identity remains blocked. */
+    struct ud_router reconnect_router;
+    ud_init(&reconnect_router, UD_HANA);
+    assert(ud_assign(&reconnect_router, 0, UD_HANA, UD_LEFT) == UD_OK);
+    assert(ud_connected(&reconnect_router, 0, true) == UD_OK);
+    assert(ud_connected(&reconnect_router, 0, false) == UD_OK);
+    assert(ud_begin_switch(&reconnect_router, UD_CHOCOFI) == UD_OK);
+    assert(ud_assign(&reconnect_router, 0, UD_HANA, UD_LEFT) == UD_OK);
+    assert(ud_assign(&reconnect_router, 1, UD_HANA, UD_RIGHT) == UD_BUSY);
+
     /* Protocol identities map to logical slots, never BLE connection order. */
     assert(ud_identity_to_slot(1, 1, 1) == 0); /* Hana left */
     assert(ud_identity_to_slot(1, 1, 2) == 1); /* Hana right */
