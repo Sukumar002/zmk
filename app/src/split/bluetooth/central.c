@@ -1118,6 +1118,11 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
         uint8_t logical_slot = identity_slot->logical_slot;
         (void)ud_connected(&universal_router, logical_slot, false);
         (void)ud_onboarding_set_discovered(&universal_onboarding, logical_slot, false);
+        if ((enum ud_board)(identity_slot->identity[1] - 1) == universal_router.active &&
+            ud_connected_count(&universal_router, universal_router.active) < 2) {
+            /* Fail closed until a complete, safely selected pair is available. */
+            universal_router.idle = true;
+        }
         LOG_INF("Universal controller slot %u disconnected; %u/4 currently discovered",
                 logical_slot, ud_onboarding_discovered_count(&universal_onboarding));
     }
