@@ -1503,9 +1503,8 @@ void peripheral_event_work_callback(struct k_work *work) {
              * the BLE slot's identity has been cleared. */
             uint32_t unified_position;
             if (pressed) {
-                int translate_result =
-                    ud_translate_position((enum ud_board)(slot->identity[1] - 1), position,
-                                          &unified_position);
+                int translate_result = ud_translate_position((enum ud_board)(slot->identity[1] - 1),
+                                                                     position, &unified_position);
                 if (translate_result != UD_OK) {
                     *accepted = false;
                     LOG_WRN("Ignoring unmappable universal key position board %u position %u",
