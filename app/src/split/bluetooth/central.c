@@ -151,6 +151,10 @@ static struct ud_onboarding universal_onboarding;
 /* Per physical connection slot and key position: only admitted presses may release. */
 static bool universal_accepted_positions[ZMK_SPLIT_BLE_PERIPHERAL_COUNT]
                                         [POSITION_STATE_DATA_LEN * 8];
+/* Cache translated positions per physical source position so disconnect-time
+ * synthetic releases still release the same universal key after identity reset. */
+static uint8_t universal_unified_positions[ZMK_SPLIT_BLE_PERIPHERAL_COUNT]
+                                          [POSITION_STATE_DATA_LEN * 8];
 #endif
 
 static bool is_scanning = false;
@@ -1475,6 +1479,7 @@ void peripheral_event_work_callback(struct k_work *work) {
 
             bool *accepted = &universal_accepted_positions[ev.source][position];
             bool pressed = ev.event.data.key_position_event.pressed;
+            bool was_accepted = *accepted;
             struct peripheral_slot *slot = &peripherals[ev.source];
             int filter_result;
             if (pressed) {
@@ -1492,21 +1497,25 @@ void peripheral_event_work_callback(struct k_work *work) {
                 continue;
             }
 
-            /* The universal keymap uses Hana's 46-position matrix as its
-             * coordinate space. Translate Chocofi's native position before
-             * handing the event to ZMK's central event handler. Keep the
-             * accepted-position bitmap indexed by the source's native index. */
-            if (!slot->identity_valid) {
-                LOG_WRN("Ignoring key event from source %u without validated identity", ev.source);
-                continue;
-            }
+            /* Keep the original position for press/release admission tracking,
+             * but send ZMK the translated coordinate. Cache the translation at
+             * press time so disconnect-time synthetic releases still work after
+             * the BLE slot's identity has been cleared. */
             uint32_t unified_position;
-            int translate_result =
-                ud_translate_position((enum ud_board)(slot->identity[1] - 1), position,
-                                      &unified_position);
-            if (translate_result != UD_OK) {
-                LOG_WRN("Ignoring unmappable universal key position board %u position %u",
-                        slot->identity[1], position);
+            if (pressed) {
+                int translate_result =
+                    ud_translate_position((enum ud_board)(slot->identity[1] - 1), position,
+                                          &unified_position);
+                if (translate_result != UD_OK) {
+                    *accepted = false;
+                    LOG_WRN("Ignoring unmappable universal key position board %u position %u",
+                            slot->identity[1], position);
+                    continue;
+                }
+                universal_unified_positions[ev.source][position] = (uint8_t)unified_position;
+            } else if (was_accepted) {
+                unified_position = universal_unified_positions[ev.source][position];
+            } else {
                 continue;
             }
             ev.event.data.key_position_event.position = unified_position;
