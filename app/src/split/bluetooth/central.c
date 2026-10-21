@@ -538,22 +538,8 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
     slot->logical_slot = logical_slot;
     slot->identity_valid = true;
 
-    /* Preserve focus when the inactive board reconnects. Only select the current
-     * profile layer when needed, and fail closed if the universal keymap is absent. */
-    if (ud_connected_count(&universal_router, universal_router.active) == 2) {
-        if ((!universal_profile_layer_selected ||
-             universal_profile_layer_board != universal_router.active) &&
-            universal_activate_profile_layer(universal_router.active) != 0) {
-            universal_router.idle = true;
-        } else {
-            universal_router.idle = false;
-        }
-    } else {
-        int availability = ud_reconcile_availability(&universal_router);
-        if (availability == UD_OK) {
-            universal_complete_switch_if_drained();
-        }
-    }
+    /* Defer layer selection and failover decisions to the central event worker. */
+    k_work_submit(&peripheral_event_work);
 
     LOG_INF("Validated universal peripheral identity: board %u side %u (logical slot %u, %u/4 "
             "discovered)",
@@ -1250,11 +1236,8 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
     }
 
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
-    /* Reconcile only after disconnect releases have been queued. The switch helper
-     * waits for those admitted presses to drain before activating another profile. */
-    if (ud_reconcile_availability(&universal_router) == UD_OK) {
-        universal_complete_switch_if_drained();
-    }
+    /* Run reconciliation on the same worker that drains synthetic key releases. */
+    k_work_submit(&peripheral_event_work);
 #endif
 
     k_work_submit(&notify_status_work);
@@ -1623,7 +1606,24 @@ void peripheral_event_work_callback(struct k_work *work) {
         zmk_split_transport_central_peripheral_event_handler(&bt_central, ev.source, ev.event);
     }
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
-    /* Synthetic disconnect releases are processed above; only now may focus move. */
+    /* Reconcile and switch only on this worker, after queued HID releases are sent. */
+    if (universal_router.phase == UD_READY) {
+        (void)ud_reconcile_availability(&universal_router);
+    }
     universal_complete_switch_if_drained();
+
+    if (universal_router.phase == UD_READY) {
+        if (ud_connected_count(&universal_router, universal_router.active) == 2) {
+            if ((!universal_profile_layer_selected ||
+                 universal_profile_layer_board != universal_router.active) &&
+                universal_activate_profile_layer(universal_router.active) != 0) {
+                universal_router.idle = true;
+            } else {
+                universal_router.idle = false;
+            }
+        } else {
+            universal_router.idle = true;
+        }
+    }
 #endif
 }
