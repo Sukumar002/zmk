@@ -148,6 +148,8 @@ static struct peripheral_slot peripherals[ZMK_SPLIT_BLE_PERIPHERAL_COUNT];
 /* These state models are keyed by validated logical identity, never BLE slot order. */
 static struct ud_router universal_router;
 static struct ud_onboarding universal_onboarding;
+/* Per physical connection slot and key position: only admitted presses may release. */
+static bool universal_accepted_positions[ZMK_SPLIT_BLE_PERIPHERAL_COUNT][POSITION_STATE_DATA_LEN * 8];
 #endif
 
 static bool is_scanning = false;
