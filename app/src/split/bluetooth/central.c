@@ -34,6 +34,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/hid_indicators_types.h>
 #include <zmk/physical_layouts.h>
 #include <zmk/universal_router.h>
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+#include <zmk/universal_onboarding.h>
+#endif
 
 static int start_scanning(void);
 
@@ -141,6 +144,11 @@ static zmk_split_transport_central_status_changed_cb_t transport_status_cb;
 static bool is_enabled;
 
 static struct peripheral_slot peripherals[ZMK_SPLIT_BLE_PERIPHERAL_COUNT];
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+/* These state models are keyed by validated logical identity, never BLE slot order. */
+static struct ud_router universal_router;
+static struct ud_onboarding universal_onboarding;
+#endif
 
 static bool is_scanning = false;
 
@@ -424,10 +432,29 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
         }
     }
 
+    int route_err = ud_assign(&universal_router, logical_slot,
+                              (enum ud_board)(slot->identity[1] - 1),
+                              (enum ud_side)(slot->identity[2] - 1));
+    if (route_err != UD_OK && route_err != UD_BUSY) {
+        LOG_WRN("Rejecting identity because router assignment failed (%d)", route_err);
+        return BT_GATT_ITER_STOP;
+    }
+    route_err = ud_connected(&universal_router, logical_slot, true);
+    if (route_err != UD_OK) {
+        LOG_WRN("Rejecting identity because router connection state failed (%d)", route_err);
+        return BT_GATT_ITER_STOP;
+    }
+    if (ud_onboarding_set_discovered(&universal_onboarding, logical_slot, true) != UD_OK) {
+        LOG_WRN("Could not update onboarding state for logical slot %u", logical_slot);
+        (void)ud_connected(&universal_router, logical_slot, false);
+        return BT_GATT_ITER_STOP;
+    }
+
     slot->logical_slot = logical_slot;
     slot->identity_valid = true;
-    LOG_INF("Validated universal peripheral identity: board %u side %u (logical slot %u)",
-            slot->identity[1], slot->identity[2], slot->logical_slot);
+    LOG_INF("Validated universal peripheral identity: board %u side %u (logical slot %u, %u/4 discovered)",
+            slot->identity[1], slot->identity[2], slot->logical_slot,
+            ud_onboarding_discovered_count(&universal_onboarding));
     return BT_GATT_ITER_STOP;
 }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
@@ -1078,6 +1105,16 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
     int err;
 
     bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    struct peripheral_slot *identity_slot = peripheral_slot_for_conn(conn);
+    if (identity_slot && identity_slot->identity_valid) {
+        uint8_t logical_slot = identity_slot->logical_slot;
+        (void)ud_connected(&universal_router, logical_slot, false);
+        (void)ud_onboarding_set_discovered(&universal_onboarding, logical_slot, false);
+        LOG_INF("Universal controller slot %u disconnected; %u/4 currently discovered",
+                logical_slot, ud_onboarding_discovered_count(&universal_onboarding));
+    }
+#endif
 
     LOG_DBG("Disconnected: %s (reason %d)", addr, reason);
 
@@ -1270,6 +1307,10 @@ static int zmk_split_bt_central_init(void) {
     k_work_queue_start(&split_central_split_run_q, split_central_split_run_q_stack,
                        K_THREAD_STACK_SIZEOF(split_central_split_run_q_stack),
                        CONFIG_ZMK_BLE_THREAD_PRIORITY, NULL);
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    ud_init(&universal_router, UD_HANA);
+    ud_onboarding_init(&universal_onboarding, false);
+#endif
     bt_conn_cb_register(&conn_callbacks);
 
 #if IS_ENABLED(CONFIG_SETTINGS)
