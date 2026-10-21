@@ -38,7 +38,8 @@ int ud_accept_position(const struct ud_router *r, uint8_t slot);
 /* Translate each board's native row-major position index into the 46-position
  * universal keymap. Hana is the reference layout; Chocofi's 36 positions map
  * into the matching keys, leaving Hana-only positions unused. */
-int ud_translate_position(enum ud_board board, uint32_t source_position, uint32_t *unified_position);
+int ud_translate_position(enum ud_board board, uint32_t source_position,
+                          uint32_t *unified_position);
 int ud_begin_switch(struct ud_router *r, enum ud_board target);
 int ud_ack_released(struct ud_router *r);
 int ud_finish_switch(struct ud_router *r);
