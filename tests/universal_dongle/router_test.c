@@ -38,6 +38,27 @@ int main(void) {
     assert(ud_identity_to_slot(1, 3, 1) == UD_NO_SLOT);
     assert(ud_identity_to_slot(1, 1, 0) == UD_NO_SLOT);
     assert(ud_identity_to_slot(1, 1, 3) == UD_NO_SLOT);
+
+    /* Both native layouts translate into a stable 46-position universal map. */
+    uint32_t mapped = UINT32_MAX;
+    assert(ud_translate_position(UD_HANA, 0, &mapped) == UD_OK && mapped == 0);
+    assert(ud_translate_position(UD_HANA, 45, &mapped) == UD_OK && mapped == 45);
+    assert(ud_translate_position(UD_CHOCOFI, 0, &mapped) == UD_OK && mapped == 1);
+    assert(ud_translate_position(UD_CHOCOFI, 20, &mapped) == UD_OK && mapped == 25);
+    assert(ud_translate_position(UD_CHOCOFI, 25, &mapped) == UD_OK && mapped == 32);
+    assert(ud_translate_position(UD_CHOCOFI, 35, &mapped) == UD_OK && mapped == 45);
+    assert(ud_translate_position(UD_HANA, 46, &mapped) == UD_INVALID);
+    assert(ud_translate_position(UD_CHOCOFI, 36, &mapped) == UD_INVALID);
+    assert(ud_translate_position(UD_CHOCOFI, 0, NULL) == UD_INVALID);
+    assert(ud_translate_position((enum ud_board) -1, 0, &mapped) == UD_INVALID);
+    bool seen[UD_HANA_POSITION_COUNT] = {false};
+    for (uint32_t i = 0; i < UD_CHOCOFI_POSITION_COUNT; i++) {
+        assert(ud_translate_position(UD_CHOCOFI, i, &mapped) == UD_OK);
+        assert(mapped < UD_HANA_POSITION_COUNT);
+        assert(!seen[mapped]);
+        seen[mapped] = true;
+    }
+
     assert(ud_assign(&r, 0, UD_HANA, UD_LEFT) == UD_OK);
     assert(ud_assign(&r, 1, UD_HANA, UD_RIGHT) == UD_OK);
     assert(ud_assign(&r, 2, UD_CHOCOFI, UD_LEFT) == UD_OK);
