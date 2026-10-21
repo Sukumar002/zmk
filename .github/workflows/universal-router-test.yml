@@ -1,7 +1,7 @@
 name: Universal dongle routing unit tests
 on:
   push:
-    branches: [experiment/universal-dongle]
+    branches: [experiment/universal-dongle, project/universal-dongle-routing]
     paths:
       - "app/include/zmk/universal_router.h"
       - "app/src/universal_dongle/router.c"
