@@ -5,10 +5,14 @@ on:
     paths:
       - "app/run-test.sh"
       - "app/tests/**"
+      - "tests/universal_dongle/**"
+      - ".github/workflows/test.yml"
   pull_request:
     paths:
       - "app/run-test.sh"
       - "app/tests/**"
+      - "tests/universal_dongle/**"
+      - ".github/workflows/test.yml"
   workflow_dispatch:
 
 jobs:
