@@ -10,8 +10,7 @@
 
 static lv_obj_t *keyboard_icon;
 static lv_obj_t *keyboard_name;
-static lv_obj_t *battery_left;
-static lv_obj_t *battery_right;
+static lv_obj_t *battery_rows[4];
 static lv_obj_t *timeout_status_obj;
 static struct k_work_delayable hide_name_work;
 static struct k_work refresh_work;
@@ -27,36 +26,35 @@ static bool show_name;
 
 static void render_status(struct k_work *work) {
     ARG_UNUSED(work);
-    if (!state_initialized || !keyboard_icon || !keyboard_name || !battery_left || !battery_right) {
+    if (!state_initialized || !keyboard_icon || !keyboard_name) {
         return;
     }
     k_mutex_lock(&state_mutex, K_FOREVER);
     uint8_t board = active_board_id;
-    int left = battery_levels[board][1];
-    int right = battery_levels[board][2];
+    int levels[4] = {battery_levels[1][1], battery_levels[1][2], battery_levels[2][1], battery_levels[2][2]};
     bool name_visible = show_name;
     k_mutex_unlock(&state_mutex);
 
     char icon_text[12];
-    snprintk(icon_text, sizeof(icon_text), LV_SYMBOL_KEYBOARD " %u", board);
+    snprintk(icon_text, sizeof(icon_text), "KB%u", board);
     lv_label_set_text(keyboard_icon, icon_text);
-    lv_label_set_text(keyboard_name, name_visible ? (board == 1 ? "Hana" : "Chocofi") : "");
-    if (name_visible && timeout_status_obj) {
-        lv_obj_add_flag(timeout_status_obj, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text(keyboard_name, "");
+    ARG_UNUSED(name_visible);
+    for (int i = 0; i < 4; i++) {
+        char text[16];
+        uint8_t battery_board = (i < 2) ? 1 : 2;
+        uint8_t battery_side = (i % 2) + 1;
+        const char *name = battery_board == 1 ? "H" : "C";
+        const char *side = battery_side == 1 ? "L" : "R";
+        if (levels[i] >= 0 && levels[i] <= 100) {
+            snprintk(text, sizeof(text), "%s%s %u%%", name, side, levels[i]);
+        } else {
+            snprintk(text, sizeof(text), "%s%s --", name, side);
+        }
+        if (battery_rows[i]) {
+            lv_label_set_text(battery_rows[i], text);
+        }
     }
-    char left_text[12], right_text[12];
-    if (left >= 0 && left <= 100) {
-        snprintk(left_text, sizeof(left_text), LV_SYMBOL_BATTERY_3 " %u%%", left);
-    } else {
-        snprintk(left_text, sizeof(left_text), "--");
-    }
-    if (right >= 0 && right <= 100) {
-        snprintk(right_text, sizeof(right_text), LV_SYMBOL_BATTERY_3 " %u%%", right);
-    } else {
-        snprintk(right_text, sizeof(right_text), "--");
-    }
-    lv_label_set_text(battery_left, left_text);
-    lv_label_set_text(battery_right, right_text);
 }
 
 static void hide_name_work_cb(struct k_work *work) {
@@ -77,13 +75,11 @@ void zmk_universal_oled_status_init(lv_obj_t *parent, lv_obj_t *timeout_obj) {
     keyboard_icon = lv_label_create(parent);
     lv_obj_align(keyboard_icon, LV_ALIGN_TOP_LEFT, 36, 0);
     keyboard_name = lv_label_create(parent);
-    lv_obj_set_style_text_font(keyboard_name, lv_theme_get_font_large(parent), LV_PART_MAIN);
-    lv_obj_set_style_text_align(keyboard_name, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_align(keyboard_name, LV_ALIGN_CENTER, 0, 0);
-    battery_left = lv_label_create(parent);
-    battery_right = lv_label_create(parent);
-    lv_obj_align(battery_right, LV_ALIGN_TOP_RIGHT, 0, 0);
-    lv_obj_align(battery_left, LV_ALIGN_TOP_RIGHT, -36, 0);
+    lv_obj_add_flag(keyboard_name, LV_OBJ_FLAG_HIDDEN);
+    for (int i = 0; i < 4; i++) {
+        battery_rows[i] = lv_label_create(parent);
+        lv_obj_align(battery_rows[i], LV_ALIGN_TOP_RIGHT, 0, i * 10);
+    }
     k_work_submit_to_queue(zmk_display_work_q(), &refresh_work);
     k_mutex_lock(&state_mutex, K_FOREVER);
     bool name_was_requested = show_name;
