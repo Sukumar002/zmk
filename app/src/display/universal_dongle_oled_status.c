@@ -75,7 +75,7 @@ void zmk_universal_oled_status_init(lv_obj_t *parent, lv_obj_t *timeout_obj) {
         state_initialized = true;
     }
     keyboard_icon = lv_label_create(parent);
-    lv_obj_align(keyboard_icon, LV_ALIGN_TOP_LEFT, 48, 0);
+    lv_obj_align(keyboard_icon, LV_ALIGN_TOP_LEFT, 36, 0);
     keyboard_name = lv_label_create(parent);
     lv_obj_set_style_text_font(keyboard_name, lv_theme_get_font_large(parent), LV_PART_MAIN);
     lv_obj_set_style_text_align(keyboard_name, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
@@ -83,7 +83,7 @@ void zmk_universal_oled_status_init(lv_obj_t *parent, lv_obj_t *timeout_obj) {
     battery_left = lv_label_create(parent);
     battery_right = lv_label_create(parent);
     lv_obj_align(battery_right, LV_ALIGN_TOP_RIGHT, 0, 0);
-    lv_obj_align(battery_left, LV_ALIGN_TOP_RIGHT, -42, 0);
+    lv_obj_align(battery_left, LV_ALIGN_TOP_RIGHT, -36, 0);
     k_work_submit_to_queue(zmk_display_work_q(), &refresh_work);
     k_mutex_lock(&state_mutex, K_FOREVER);
     bool name_was_requested = show_name;
