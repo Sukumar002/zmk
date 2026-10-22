@@ -686,8 +686,8 @@ static uint8_t split_central_universal_switch_notify(struct bt_conn *conn,
         LOG_WRN("Rejected universal switch request from board %u to board %u (%d)",
                 source_board + 1, target_id, result);
     } else {
-        LOG_INF("Accepted universal switch request from board %u to board %u",
-                source_board + 1, target_id);
+        LOG_INF("Accepted universal switch request from board %u to board %u", source_board + 1,
+                target_id);
     }
     return BT_GATT_ITER_CONTINUE;
 }
@@ -971,8 +971,9 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
             slot->discover_params.start_handle = attr->handle + 2;
             slot->run_behavior_handle = bt_gatt_attr_value_handle(attr);
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
-        } else if (bt_uuid_cmp(chrc_uuid, BT_UUID_DECLARE_128(
-                                              ZMK_SPLIT_BT_CHAR_UNIVERSAL_SWITCH_REQUEST_UUID)) == 0) {
+        } else if (bt_uuid_cmp(
+                       chrc_uuid,
+                       BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_UNIVERSAL_SWITCH_REQUEST_UUID)) == 0) {
             LOG_DBG("Found universal switch request characteristic");
             slot->universal_switch_request_handle = bt_gatt_attr_value_handle(attr);
             slot->universal_switch_subscribe_params.disc_params = &slot->sub_discover_params;
