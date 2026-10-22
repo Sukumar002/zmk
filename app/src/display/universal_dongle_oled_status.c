@@ -11,7 +11,7 @@
 #define UD_KEYBOARD_ICON_H 14
 #define UD_KEYBOARD_SOURCE_W 12
 #define UD_KEYBOARD_SOURCE_H 8
-#define UD_BATTERY_ICON_W 7
+#define UD_BATTERY_ICON_W 5
 #define UD_BATTERY_ICON_H 8
 
 static lv_obj_t *keyboard_icon;
@@ -73,42 +73,47 @@ static void draw_keyboard_icon(void) {
 
 /*
  * Pixel battery glyph based on the established Hana OLED battery artwork.
- * Its 7x8 silhouette is intentionally distinct from the keyboard icon and
- * fills from empty to full in proportion to the reported percentage.
+ * Match the original Hana v2.2 5x8 battery artwork and its percentage bands.
  */
 static void draw_battery_icon(int index, int level) {
     lv_obj_t *canvas = battery_icons[index];
     lv_canvas_fill_bg(canvas, lv_color_black(), LV_OPA_COVER);
 
-    const lv_color_t white = lv_color_white();
+    lv_layer_t layer;
+    lv_canvas_init_layer(canvas, &layer);
 
-    /* Top terminal and recognizable battery case. */
-    lv_canvas_set_px(canvas, 2, 0, white, LV_OPA_COVER);
-    lv_canvas_set_px(canvas, 3, 0, white, LV_OPA_COVER);
-    lv_canvas_set_px(canvas, 4, 0, white, LV_OPA_COVER);
-    for (int x = 1; x <= 5; x++) {
-        lv_canvas_set_px(canvas, x, 1, white, LV_OPA_COVER);
-        lv_canvas_set_px(canvas, x, 7, white, LV_OPA_COVER);
-    }
-    for (int y = 2; y <= 6; y++) {
-        lv_canvas_set_px(canvas, 1, y, white, LV_OPA_COVER);
-        lv_canvas_set_px(canvas, 5, y, white, LV_OPA_COVER);
-    }
+    lv_draw_rect_dsc_t rect_fill_dsc;
+    lv_draw_rect_dsc_init(&rect_fill_dsc);
+    rect_fill_dsc.bg_color = lv_color_white();
+
+    lv_canvas_set_px(canvas, 0, 0, lv_color_white(), LV_OPA_COVER);
+    lv_canvas_set_px(canvas, 4, 0, lv_color_white(), LV_OPA_COVER);
+
+    lv_area_t rect_coords;
+    bool rect_draw = true;
 
     if (level < 0 || level > 100) {
+        lv_canvas_finish_layer(canvas, &layer);
         return;
+    } else if (level <= 10) {
+        rect_coords = (lv_area_t){1, 2, 3, 6};
+    } else if (level <= 30) {
+        rect_coords = (lv_area_t){1, 2, 3, 5};
+    } else if (level <= 50) {
+        rect_coords = (lv_area_t){1, 2, 3, 4};
+    } else if (level <= 70) {
+        rect_coords = (lv_area_t){1, 2, 3, 3};
+    } else if (level <= 90) {
+        rect_coords = (lv_area_t){1, 2, 3, 2};
+    } else {
+        rect_draw = false;
     }
 
-    /* Five fill steps map cleanly to 0, 20, 40, 60, 80 and 100 percent. */
-    int fill_rows = (level * 5 + 99) / 100;
-    if (fill_rows > 5) {
-        fill_rows = 5;
+    if (rect_draw) {
+        lv_draw_rect(&layer, &rect_fill_dsc, &rect_coords);
     }
-    for (int y = 6; y >= 2 && (6 - y) < fill_rows; y--) {
-        for (int x = 2; x <= 4; x++) {
-            lv_canvas_set_px(canvas, x, y, white, LV_OPA_COVER);
-        }
-    }
+
+    lv_canvas_finish_layer(canvas, &layer);
 }
 
 static void render_status(struct k_work *work) {
@@ -134,7 +139,7 @@ static void render_status(struct k_work *work) {
     for (int i = 0; i < 2; i++) {
         char text[8];
         if (levels[i] >= 0 && levels[i] <= 100) {
-            snprintk(text, sizeof(text), "%d", levels[i]);
+            snprintk(text, sizeof(text), "%d%%", levels[i]);
         } else {
             snprintk(text, sizeof(text), "--");
         }
@@ -173,9 +178,9 @@ void zmk_universal_oled_status_init(lv_obj_t *parent, lv_obj_t *timeout_obj) {
 
     for (int i = 0; i < 2; i++) {
         battery_rows[i] = lv_label_create(parent);
-        lv_obj_set_width(battery_rows[i], 20);
+        lv_obj_set_width(battery_rows[i], 29);
         lv_obj_set_style_text_align(battery_rows[i], LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
-        lv_obj_align(battery_rows[i], LV_ALIGN_TOP_RIGHT, -7, i * 10);
+        lv_obj_align(battery_rows[i], LV_ALIGN_TOP_RIGHT, -8, i * 10);
         battery_icons[i] = lv_canvas_create(parent);
         lv_canvas_set_buffer(battery_icons[i], battery_icon_buffers[i], UD_BATTERY_ICON_W,
                              UD_BATTERY_ICON_H, LV_COLOR_FORMAT_L8);
