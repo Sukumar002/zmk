@@ -80,6 +80,12 @@ void zmk_universal_oled_status_init(lv_obj_t *parent) {
     lv_obj_align(battery_right, LV_ALIGN_TOP_RIGHT, 0, 0);
     lv_obj_align(battery_left, LV_ALIGN_TOP_RIGHT, -42, 0);
     k_work_submit_to_queue(zmk_display_work_q(), &refresh_work);
+    k_mutex_lock(&state_mutex, K_FOREVER);
+    bool name_was_requested = show_name;
+    k_mutex_unlock(&state_mutex);
+    if (name_was_requested) {
+        k_work_reschedule_for_queue(zmk_display_work_q(), &hide_name_work, K_MSEC(UD_OLED_NAME_MS));
+    }
 }
 
 void zmk_universal_oled_status_set_active(uint8_t board_id) {
