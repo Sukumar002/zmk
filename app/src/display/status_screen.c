@@ -48,7 +48,7 @@ lv_obj_t *zmk_display_status_screen() {
     lv_obj_align(zmk_widget_battery_status_obj(&battery_status_widget), LV_ALIGN_TOP_RIGHT, 0, 0);
 #endif
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
-    zmk_universal_oled_status_init(screen);
+    zmk_universal_oled_status_init(screen, NULL);
 #endif
 
 #if IS_ENABLED(CONFIG_ZMK_WIDGET_OUTPUT_STATUS)
