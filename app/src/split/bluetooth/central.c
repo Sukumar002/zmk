@@ -221,7 +221,8 @@ static int universal_activate_profile_layer(enum ud_board board) {
         return -EAGAIN;
     }
 
-    bool newly_selected = !universal_profile_layer_selected || universal_profile_layer_board != board;
+    bool newly_selected =
+        !universal_profile_layer_selected || universal_profile_layer_board != board;
     (void)zmk_keymap_layer_to(layer, false);
     universal_profile_layer_selected = true;
     universal_profile_layer_board = board;
@@ -1488,7 +1489,8 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
         uint8_t logical_slot = identity_slot->logical_slot;
         k_mutex_lock(&universal_router_mutex, K_FOREVER);
         (void)ud_connected(&universal_router, logical_slot, false);
-        zmk_universal_oled_status_set_battery(identity_slot->identity[1], identity_slot->identity[2], -1);
+        zmk_universal_oled_status_set_battery(identity_slot->identity[1],
+                                              identity_slot->identity[2], -1);
         if ((enum ud_board)(identity_slot->identity[1] - 1) == universal_router.active &&
             ud_connected_count(&universal_router, universal_router.active) < 2) {
             /* Fail closed until a complete, safely selected pair is available. */
