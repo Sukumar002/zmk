@@ -811,8 +811,8 @@ static uint8_t split_central_notify_func(struct bt_conn *conn,
                     .source = source,
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
                     .generation = source >= 0 && source < ARRAY_SIZE(universal_slot_generation)
-                                     ? universal_slot_generation[source]
-                                     : 0,
+                                      ? universal_slot_generation[source]
+                                      : 0,
 #endif
                     .event = {.type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT,
                               .data = {.key_position_event = {
@@ -1837,7 +1837,7 @@ void peripheral_event_work_callback(struct k_work *work) {
             bool was_accepted = *accepted;
             int filter_result;
             if (pressed) {
-                if (!slot->identity_valid) {
+                if (!slot->identity_valid || ev.generation != universal_slot_generation[ev.source]) {
                     k_mutex_unlock(&universal_router_mutex);
                     continue;
                 }
