@@ -1837,7 +1837,8 @@ void peripheral_event_work_callback(struct k_work *work) {
             bool was_accepted = *accepted;
             int filter_result;
             if (pressed) {
-                if (!slot->identity_valid || ev.generation != universal_slot_generation[ev.source]) {
+                if (!slot->identity_valid ||
+                    ev.generation != universal_slot_generation[ev.source]) {
                     k_mutex_unlock(&universal_router_mutex);
                     continue;
                 }
