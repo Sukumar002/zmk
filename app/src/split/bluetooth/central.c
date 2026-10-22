@@ -185,7 +185,7 @@ static bool universal_any_accepted_positions(void) {
 
 /* The universal keymap provides full profile layers with these stable names. */
 static int universal_find_profile_layer(enum ud_board board, zmk_keymap_layer_id_t *layer) {
-    const char *wanted = board == UD_HANA ? "HANA_BASE" : "CHOCOFI_BASE";
+    const char *wanted = board == UD_HANA ? "Base_H" : "Base_C";
     if (!layer || (board != UD_HANA && board != UD_CHOCOFI)) {
         return -EINVAL;
     }
