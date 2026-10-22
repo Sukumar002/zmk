@@ -981,8 +981,8 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
                 slot->universal_switch_request_handle;
             slot->universal_switch_subscribe_params.notify = split_central_universal_switch_notify;
             slot->universal_switch_subscribe_params.value = BT_GATT_CCC_NOTIFY;
-            int switch_sub_err = split_central_subscribe(conn,
-                                                         &slot->universal_switch_subscribe_params);
+            int switch_sub_err =
+                split_central_subscribe(conn, &slot->universal_switch_subscribe_params);
             if (switch_sub_err) {
                 LOG_WRN("Could not subscribe to universal switch requests (%d)", switch_sub_err);
             }
@@ -1085,8 +1085,8 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
     bool subscribed = slot->run_behavior_handle && slot->subscribe_params.value_handle &&
                       slot->selected_physical_layout_handle;
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
-    subscribed = subscribed && slot->identity_handle &&
-                 slot->universal_switch_subscribe_params.value_handle;
+    subscribed =
+        subscribed && slot->identity_handle && slot->universal_switch_subscribe_params.value_handle;
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
 
 #if ZMK_KEYMAP_HAS_SENSORS
