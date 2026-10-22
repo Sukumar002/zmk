@@ -695,6 +695,16 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
 
     slot->logical_slot = logical_slot;
     slot->identity_valid = true;
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
+    /* Battery discovery can finish before encrypted identity validation. Re-read
+     * now that this connection's board/side identity is trusted. */
+    if (slot->batt_lvl_read_params.single.handle != 0) {
+        int battery_read_err = bt_gatt_read(conn, &slot->batt_lvl_read_params);
+        if (battery_read_err) {
+            LOG_DBG("Could not refresh battery after identity validation (%d)", battery_read_err);
+        }
+    }
+#endif
 
     /* Defer layer selection and failover decisions to the central event worker. */
     k_work_submit(&peripheral_event_work);
