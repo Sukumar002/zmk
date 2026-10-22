@@ -133,9 +133,6 @@ void zmk_universal_oled_status_set_battery(uint8_t board_id, uint8_t side_id, in
     }
     k_mutex_lock(&state_mutex, K_FOREVER);
     battery_levels[board_id][side_id] = (level >= 0 && level <= 100) ? level : UD_OLED_UNKNOWN;
-    bool active = active_board_id == board_id;
     k_mutex_unlock(&state_mutex);
-    if (active) {
-        k_work_submit_to_queue(zmk_display_work_q(), &refresh_work);
-    }
+    k_work_submit_to_queue(zmk_display_work_q(), &refresh_work);
 }
