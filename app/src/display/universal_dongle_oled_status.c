@@ -4,14 +4,17 @@
 #include <lvgl.h>
 #include <zmk/display.h>
 #include <zmk/universal_dongle_oled_status.h>
+#include "timeout_status.h"
 
 #define UD_OLED_UNKNOWN (-1)
 #define UD_OLED_NAME_MS 2500
 
 static lv_obj_t *keyboard_icon;
+static lv_obj_t *keyboard_number;
+static lv_color_t keyboard_icon_buffer[LV_CANVAS_BUF_SIZE(12, 8, LV_COLOR_FORMAT_GET_BPP(LV_COLOR_FORMAT_L8), LV_DRAW_BUF_STRIDE_ALIGN)];
+static uint8_t last_name_board;
 static lv_obj_t *keyboard_name;
 static lv_obj_t *battery_rows[4];
-static lv_obj_t *timeout_status_obj;
 static struct k_work_delayable hide_name_work;
 static struct k_work refresh_work;
 K_MUTEX_DEFINE(state_mutex);
@@ -36,10 +39,29 @@ static void render_status(struct k_work *work) {
     k_mutex_unlock(&state_mutex);
 
     char icon_text[12];
-    snprintk(icon_text, sizeof(icon_text), "KB%u", board);
-    lv_label_set_text(keyboard_icon, icon_text);
+    lv_canvas_fill_bg(keyboard_icon, lv_color_black(), LV_OPA_TRANSP);
+    for (int x = 0; x < 12; x++) {
+        lv_canvas_set_px(keyboard_icon, x, 0, lv_color_white(), LV_OPA_COVER);
+        lv_canvas_set_px(keyboard_icon, x, 7, lv_color_white(), LV_OPA_COVER);
+    }
+    for (int y = 1; y < 7; y++) {
+        lv_canvas_set_px(keyboard_icon, 0, y, lv_color_white(), LV_OPA_COVER);
+        lv_canvas_set_px(keyboard_icon, 11, y, lv_color_white(), LV_OPA_COVER);
+    }
+    for (int x = 2; x <= 9; x += 2) {
+        lv_canvas_set_px(keyboard_icon, x, 2, lv_color_white(), LV_OPA_COVER);
+        lv_canvas_set_px(keyboard_icon, x, 4, lv_color_white(), LV_OPA_COVER);
+    }
+    for (int x = 3; x <= 8; x++) {
+        lv_canvas_set_px(keyboard_icon, x, 6, lv_color_white(), LV_OPA_COVER);
+    }
+    snprintk(icon_text, sizeof(icon_text), "%u", board);
+    lv_label_set_text(keyboard_number, icon_text);
     lv_label_set_text(keyboard_name, "");
-    ARG_UNUSED(name_visible);
+    if (name_visible && last_name_board != board) {
+        zmk_widget_timeout_status_show_keyboard_name(board == 1 ? "Hana" : "Chocofi");
+        last_name_board = board;
+    }
     for (int i = 0; i < 4; i++) {
         char text[16];
         uint8_t battery_board = (i < 2) ? 1 : 2;
@@ -47,7 +69,7 @@ static void render_status(struct k_work *work) {
         const char *name = battery_board == 1 ? "H" : "C";
         const char *side = battery_side == 1 ? "L" : "R";
         if (levels[i] >= 0 && levels[i] <= 100) {
-            snprintk(text, sizeof(text), "%s%s %u%%", name, side, levels[i]);
+            snprintk(text, sizeof(text), "%s%s " LV_SYMBOL_BATTERY_3 " %u%%", name, side, levels[i]);
         } else {
             snprintk(text, sizeof(text), "%s%s --", name, side);
         }
@@ -66,14 +88,17 @@ static void hide_name_work_cb(struct k_work *work) {
 }
 
 void zmk_universal_oled_status_init(lv_obj_t *parent, lv_obj_t *timeout_obj) {
-    timeout_status_obj = timeout_obj;
+    ARG_UNUSED(timeout_obj);
     if (!state_initialized) {
         k_work_init(&refresh_work, render_status);
         k_work_init_delayable(&hide_name_work, hide_name_work_cb);
         state_initialized = true;
     }
-    keyboard_icon = lv_label_create(parent);
+    keyboard_icon = lv_canvas_create(parent);
+    lv_canvas_set_buffer(keyboard_icon, keyboard_icon_buffer, 12, 8, LV_COLOR_FORMAT_L8);
     lv_obj_align(keyboard_icon, LV_ALIGN_TOP_LEFT, 36, 0);
+    keyboard_number = lv_label_create(parent);
+    lv_obj_align_to(keyboard_number, keyboard_icon, LV_ALIGN_OUT_RIGHT_MID, 2, 0);
     keyboard_name = lv_label_create(parent);
     lv_obj_add_flag(keyboard_name, LV_OBJ_FLAG_HIDDEN);
     for (int i = 0; i < 4; i++) {
