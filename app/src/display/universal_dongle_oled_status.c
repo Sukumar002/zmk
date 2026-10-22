@@ -18,9 +18,9 @@ K_MUTEX_DEFINE(state_mutex);
 static bool state_initialized;
 static uint8_t active_board_id = 1;
 static int battery_levels[3][3] = {
-    { UD_OLED_UNKNOWN, UD_OLED_UNKNOWN, UD_OLED_UNKNOWN },
-    { UD_OLED_UNKNOWN, UD_OLED_UNKNOWN, UD_OLED_UNKNOWN },
-    { UD_OLED_UNKNOWN, UD_OLED_UNKNOWN, UD_OLED_UNKNOWN },
+    {UD_OLED_UNKNOWN, UD_OLED_UNKNOWN, UD_OLED_UNKNOWN},
+    {UD_OLED_UNKNOWN, UD_OLED_UNKNOWN, UD_OLED_UNKNOWN},
+    {UD_OLED_UNKNOWN, UD_OLED_UNKNOWN, UD_OLED_UNKNOWN},
 };
 static bool show_name;
 
