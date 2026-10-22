@@ -59,7 +59,12 @@ int main(void) {
     assert(ud_translate_position(UD_CHOCOFI, 0, &mapped) == UD_OK && mapped == 1);
     assert(ud_translate_position(UD_CHOCOFI, 20, &mapped) == UD_OK && mapped == 25);
     assert(ud_translate_position(UD_CHOCOFI, 25, &mapped) == UD_OK && mapped == 32);
-    assert(ud_translate_position(UD_CHOCOFI, 35, &mapped) == UD_OK && mapped == 45);
+    /* Chocofi's six native thumb keys must map contiguously to 39–44. */
+    for (uint32_t i = 0; i < 6; i++) {
+        assert(ud_translate_position(UD_CHOCOFI, 30 + i, &mapped) == UD_OK);
+        assert(mapped == 39 + i);
+    }
+    assert(ud_translate_position(UD_CHOCOFI, 35, &mapped) == UD_OK && mapped == 44);
     assert(ud_translate_position(UD_HANA, 46, &mapped) == UD_INVALID);
     assert(ud_translate_position(UD_CHOCOFI, 36, &mapped) == UD_INVALID);
     assert(ud_translate_position(UD_CHOCOFI, 0, NULL) == UD_INVALID);
