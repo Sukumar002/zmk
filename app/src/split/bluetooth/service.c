@@ -244,9 +244,6 @@ int zmk_split_bt_request_universal_switch(uint8_t target_board) {
     if (target_board < 1 || target_board > 2) {
         return -EINVAL;
     }
-    if (!zmk_split_bt_peripheral_is_connected()) {
-        return -ENOTCONN;
-    }
     universal_switch_request_target = target_board;
     /* Locate by UUID; do not rely on attribute indices that vary with Kconfig. */
     for (size_t i = 0; i < split_svc.attr_count; i++) {
