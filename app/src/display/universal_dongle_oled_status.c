@@ -14,7 +14,7 @@ static lv_obj_t *battery_left;
 static lv_obj_t *battery_right;
 static struct k_work_delayable hide_name_work;
 static struct k_work refresh_work;
-static struct k_mutex state_mutex;
+K_MUTEX_DEFINE(state_mutex);
 static bool state_initialized;
 static uint8_t active_board_id = 1;
 static int battery_levels[3][3] = {
@@ -65,7 +65,6 @@ static void hide_name_work_cb(struct k_work *work) {
 
 void zmk_universal_oled_status_init(lv_obj_t *parent) {
     if (!state_initialized) {
-        k_mutex_init(&state_mutex);
         k_work_init(&refresh_work, render_status);
         k_work_init_delayable(&hide_name_work, hide_name_work_cb);
         state_initialized = true;
@@ -88,14 +87,13 @@ void zmk_universal_oled_status_set_active(uint8_t board_id) {
         return;
     }
     k_mutex_lock(&state_mutex, K_FOREVER);
-    bool changed = active_board_id != board_id;
     active_board_id = board_id;
     show_name = true;
     k_mutex_unlock(&state_mutex);
-    if (changed || board_id == active_board_id) {
+    if (state_initialized) {
         k_work_reschedule_for_queue(zmk_display_work_q(), &hide_name_work, K_MSEC(UD_OLED_NAME_MS));
+        k_work_submit_to_queue(zmk_display_work_q(), &refresh_work);
     }
-    k_work_submit_to_queue(zmk_display_work_q(), &refresh_work);
 }
 
 void zmk_universal_oled_status_set_battery(uint8_t board_id, uint8_t side_id, int level) {
