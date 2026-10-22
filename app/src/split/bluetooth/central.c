@@ -317,6 +317,51 @@ int zmk_universal_dongle_request_switch(enum ud_board target) {
 }
 #endif
 
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+/* Q+P is detected from raw, identity-validated split position state before
+ * inactive-board positions are filtered from the ordinary keymap path.
+ * Native keymap positions: Hana Q=1/P=10; Chocofi Q=0/P=9. */
+static bool universal_position_is_pressed(const struct peripheral_slot *slot, uint8_t position) {
+    return (slot->position_state[position / 8] & BIT(position % 8)) != 0;
+}
+
+static void universal_check_qp_switch_combo(void) {
+    for (enum ud_board board = UD_HANA; board < UD_BOARD_COUNT; board++) {
+        uint8_t q_position = board == UD_HANA ? 1 : 0;
+        uint8_t p_position = board == UD_HANA ? 10 : 9;
+        bool q_pressed = false;
+        bool p_pressed = false;
+
+        for (size_t i = 0; i < ARRAY_SIZE(peripherals); i++) {
+            const struct peripheral_slot *slot = &peripherals[i];
+            if (slot->state != PERIPHERAL_SLOT_STATE_CONNECTED || !slot->identity_valid ||
+                slot->identity[1] != (uint8_t)(board + 1)) {
+                continue;
+            }
+            q_pressed |= universal_position_is_pressed(slot, q_position);
+            p_pressed |= universal_position_is_pressed(slot, p_position);
+        }
+
+        if (!q_pressed || !p_pressed) {
+            continue;
+        }
+
+        k_mutex_lock(&universal_router_mutex, K_FOREVER);
+        bool inactive = universal_router.phase == UD_READY && universal_router.active != board;
+        k_mutex_unlock(&universal_router_mutex);
+        if (inactive) {
+            int result = zmk_universal_dongle_request_switch(board);
+            if (result == UD_OK) {
+                LOG_INF("Q+P combo requested safe switch to board %u", board + 1);
+            } else if (result != UD_IGNORED) {
+                LOG_DBG("Q+P switch request not accepted for board %u (%d)", board + 1, result);
+            }
+        }
+        return;
+    }
+}
+#endif
+
 int peripheral_slot_index_for_conn(struct bt_conn *conn) {
     for (int i = 0; i < ZMK_SPLIT_BLE_PERIPHERAL_COUNT; i++) {
         if (peripherals[i].conn == conn) {
