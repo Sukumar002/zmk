@@ -649,6 +649,8 @@ static int split_central_start_identity_read(struct bt_conn *conn, struct periph
 }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
 
+static int split_central_subscribe(struct bt_conn *conn, struct bt_gatt_subscribe_params *params);
+
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
 /* Requests are accepted only over the encrypted link after this connection's
  * identity has been validated. The payload is a 1-based board ID. */
