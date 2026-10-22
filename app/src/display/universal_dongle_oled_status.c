@@ -42,12 +42,12 @@ static void render_status(struct k_work *work) {
     lv_label_set_text(keyboard_name, name_visible ? (board == 1 ? "Hana" : "Chocofi") : "");
     char left_text[12], right_text[12];
     if (left >= 0 && left <= 100) {
-        snprintk(left_text, sizeof(left_text), "%u%%", left);
+        snprintk(left_text, sizeof(left_text), LV_SYMBOL_BATTERY_3 " %u%%", left);
     } else {
         snprintk(left_text, sizeof(left_text), "--");
     }
     if (right >= 0 && right <= 100) {
-        snprintk(right_text, sizeof(right_text), "%u%%", right);
+        snprintk(right_text, sizeof(right_text), LV_SYMBOL_BATTERY_3 " %u%%", right);
     } else {
         snprintk(right_text, sizeof(right_text), "--");
     }
