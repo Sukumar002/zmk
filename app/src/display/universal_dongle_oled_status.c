@@ -170,7 +170,9 @@ void zmk_universal_oled_status_init(lv_obj_t *parent, lv_obj_t *timeout_obj) {
     keyboard_icon = lv_canvas_create(parent);
     lv_canvas_set_buffer(keyboard_icon, keyboard_icon_buffer, UD_KEYBOARD_ICON_W,
                          UD_KEYBOARD_ICON_H, LV_COLOR_FORMAT_L8);
-    lv_obj_align(keyboard_icon, LV_ALIGN_TOP_LEFT, 36, 0);
+    /* The BT/USB status glyphs use a 16px top row; center the 14px
+     * keyboard glyph vertically within that same row. */
+    lv_obj_align(keyboard_icon, LV_ALIGN_TOP_LEFT, 36, 1);
     keyboard_number = lv_label_create(parent);
     lv_obj_align_to(keyboard_number, keyboard_icon, LV_ALIGN_OUT_RIGHT_MID, 2, 0);
     keyboard_name = lv_label_create(parent);
