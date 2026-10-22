@@ -64,6 +64,16 @@ static ssize_t split_svc_universal_identity(struct bt_conn *conn, const struct b
                              sizeof(universal_dongle_identity));
 }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_PERIPHERAL_IDENTITY) */
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_PERIPHERAL_IDENTITY)
+/* Target board is encoded as a 1-based board ID (1=Hana, 2=Chocofi). */
+static uint8_t universal_switch_request_target;
+static void split_svc_universal_switch_request_ccc(const struct bt_gatt_attr *attr,
+                                                   uint16_t value) {
+    ARG_UNUSED(attr);
+    LOG_DBG("Universal switch request CCC value %u", value);
+}
+#endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_PERIPHERAL_IDENTITY) */
+
 static uint8_t position_state[POS_STATE_LEN];
 
 static struct zmk_split_run_behavior_payload behavior_run_payload;
@@ -221,8 +231,44 @@ BT_GATT_SERVICE_DEFINE(
     BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_UNIVERSAL_IDENTITY_UUID),
                            BT_GATT_CHRC_READ, BT_GATT_PERM_READ_ENCRYPT,
                            split_svc_universal_identity, NULL, NULL),
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_UNIVERSAL_SWITCH_REQUEST_UUID),
+                           BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ_ENCRYPT, NULL, NULL,
+                           &universal_switch_request_target),
+    BT_GATT_CCC(split_svc_universal_switch_request_ccc,
+                BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),
 #endif
 );
+
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_PERIPHERAL_IDENTITY)
+int zmk_split_bt_request_universal_switch(uint8_t target_board) {
+    if (target_board < 1 || target_board > 2) {
+        return -EINVAL;
+    }
+    if (!zmk_split_bt_peripheral_is_connected()) {
+        return -ENOTCONN;
+    }
+    universal_switch_request_target = target_board;
+    /* Locate by UUID; do not rely on attribute indices that vary with Kconfig. */
+    for (size_t i = 0; i < split_svc.attr_count; i++) {
+        if (bt_uuid_cmp(split_svc.attrs[i].uuid,
+                        BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_UNIVERSAL_SWITCH_REQUEST_UUID)) == 0) {
+            int err = bt_gatt_notify(NULL, &split_svc.attrs[i],
+                                     &universal_switch_request_target,
+                                     sizeof(universal_switch_request_target));
+            if (err) {
+                LOG_WRN("Failed to notify universal switch request (%d)", err);
+            }
+            return err;
+        }
+    }
+    return -ENODEV;
+}
+#else
+int zmk_split_bt_request_universal_switch(uint8_t target_board) {
+    ARG_UNUSED(target_board);
+    return -ENOTSUP;
+}
+#endif
 
 K_THREAD_STACK_DEFINE(service_q_stack, CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_STACK_SIZE);
 
