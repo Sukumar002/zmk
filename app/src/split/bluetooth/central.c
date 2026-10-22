@@ -354,9 +354,8 @@ static void universal_check_qp_switch_combo(void) {
         k_mutex_lock(&universal_router_mutex, K_FOREVER);
         enum ud_board active_board = universal_router.active;
         enum ud_switch_phase phase = universal_router.phase;
-        enum ud_board target = (active_board == board)
-                                   ? (board == UD_HANA ? UD_CHOCOFI : UD_HANA)
-                                   : board;
+        enum ud_board target =
+            (active_board == board) ? (board == UD_HANA ? UD_CHOCOFI : UD_HANA) : board;
         bool can_switch = phase == UD_READY;
         k_mutex_unlock(&universal_router_mutex);
         LOG_INF("Universal Q+P detected board=%u active=%u target=%u phase=%u", board + 1,
