@@ -343,8 +343,8 @@ static void universal_check_qp_switch_combo(void) {
             q_pressed |= slot_q;
             p_pressed |= slot_p;
             LOG_DBG("Universal QP probe board=%u slot=%u identity=%u logical=%u Q@%u=%u P@%u=%u",
-                    board + 1, (unsigned int)i, slot->identity[1], slot->logical_slot,
-                    q_position, slot_q, p_position, slot_p);
+                    board + 1, (unsigned int)i, slot->identity[1], slot->logical_slot, q_position,
+                    slot_q, p_position, slot_p);
         }
 
         if (!q_pressed || !p_pressed) {
@@ -356,8 +356,8 @@ static void universal_check_qp_switch_combo(void) {
         enum ud_switch_phase phase = universal_router.phase;
         bool inactive = phase == UD_READY && active_board != board;
         k_mutex_unlock(&universal_router_mutex);
-        LOG_INF("Universal Q+P detected board=%u active=%u phase=%u", board + 1,
-                active_board + 1, phase);
+        LOG_INF("Universal Q+P detected board=%u active=%u phase=%u", board + 1, active_board + 1,
+                phase);
         if (inactive) {
             int result = zmk_universal_dongle_request_switch(board);
             if (result == UD_OK) {
