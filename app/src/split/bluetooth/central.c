@@ -55,6 +55,10 @@ struct peripheral_slot {
     struct bt_conn *conn;
     struct bt_gatt_discover_params discover_params;
     struct bt_gatt_subscribe_params subscribe_params;
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    struct bt_gatt_subscribe_params universal_switch_subscribe_params;
+    uint16_t universal_switch_request_handle;
+#endif
     struct bt_gatt_subscribe_params sensor_subscribe_params;
     struct bt_gatt_discover_params sub_discover_params;
     uint16_t run_behavior_handle;
@@ -385,6 +389,11 @@ int release_peripheral_slot(int index) {
 
     // Clean up previously discovered handles;
     slot->subscribe_params.value_handle = 0;
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    slot->universal_switch_subscribe_params.value_handle = 0;
+    slot->universal_switch_subscribe_params.ccc_handle = 0;
+    slot->universal_switch_request_handle = 0;
+#endif
     slot->run_behavior_handle = 0;
     slot->selected_physical_layout_handle = 0;
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
@@ -637,6 +646,48 @@ static int split_central_start_identity_read(struct bt_conn *conn, struct periph
         slot->identity_read_in_progress = false;
     }
     return err;
+}
+#endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
+
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+/* Requests are accepted only over the encrypted link after this connection's
+ * identity has been validated. The payload is a 1-based board ID. */
+static uint8_t split_central_universal_switch_notify(struct bt_conn *conn,
+                                                     struct bt_gatt_subscribe_params *params,
+                                                     const void *data, uint16_t length) {
+    struct peripheral_slot *slot = peripheral_slot_for_conn(conn);
+    if (!data) {
+        params->value_handle = 0U;
+        return BT_GATT_ITER_STOP;
+    }
+    if (!slot || !slot->identity_valid || bt_conn_get_security(conn) < BT_SECURITY_L2) {
+        LOG_WRN("Ignoring universal switch request from an unvalidated peripheral");
+        return BT_GATT_ITER_CONTINUE;
+    }
+    if (length != sizeof(uint8_t)) {
+        LOG_WRN("Ignoring malformed universal switch request length %u", length);
+        return BT_GATT_ITER_CONTINUE;
+    }
+    uint8_t target_id = *(const uint8_t *)data;
+    if (target_id < 1 || target_id > UD_BOARD_COUNT) {
+        LOG_WRN("Ignoring invalid universal switch target %u", target_id);
+        return BT_GATT_ITER_CONTINUE;
+    }
+    enum ud_board source_board = (enum ud_board)(slot->identity[1] - 1);
+    enum ud_board target = (enum ud_board)(target_id - 1);
+    if (source_board == target) {
+        LOG_DBG("Ignoring switch request targeting its own board %u", target_id);
+        return BT_GATT_ITER_CONTINUE;
+    }
+    int result = zmk_universal_dongle_request_switch(target);
+    if (result != UD_OK && result != UD_IGNORED) {
+        LOG_WRN("Rejected universal switch request from board %u to board %u (%d)",
+                source_board + 1, target_id, result);
+    } else {
+        LOG_INF("Accepted universal switch request from board %u to board %u",
+                source_board + 1, target_id);
+    }
+    return BT_GATT_ITER_CONTINUE;
 }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
 
@@ -918,6 +969,21 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
             slot->discover_params.start_handle = attr->handle + 2;
             slot->run_behavior_handle = bt_gatt_attr_value_handle(attr);
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+        } else if (bt_uuid_cmp(chrc_uuid, BT_UUID_DECLARE_128(
+                                              ZMK_SPLIT_BT_CHAR_UNIVERSAL_SWITCH_REQUEST_UUID)) == 0) {
+            LOG_DBG("Found universal switch request characteristic");
+            slot->universal_switch_request_handle = bt_gatt_attr_value_handle(attr);
+            slot->universal_switch_subscribe_params.disc_params = &slot->sub_discover_params;
+            slot->universal_switch_subscribe_params.end_handle = slot->discover_params.end_handle;
+            slot->universal_switch_subscribe_params.value_handle =
+                slot->universal_switch_request_handle;
+            slot->universal_switch_subscribe_params.notify = split_central_universal_switch_notify;
+            slot->universal_switch_subscribe_params.value = BT_GATT_CCC_NOTIFY;
+            int switch_sub_err = split_central_subscribe(conn,
+                                                         &slot->universal_switch_subscribe_params);
+            if (switch_sub_err) {
+                LOG_WRN("Could not subscribe to universal switch requests (%d)", switch_sub_err);
+            }
         } else if (bt_uuid_cmp(chrc_uuid, BT_UUID_DECLARE_128(
                                               ZMK_SPLIT_BT_CHAR_UNIVERSAL_IDENTITY_UUID)) == 0) {
             LOG_DBG("Found universal peripheral identity characteristic");
