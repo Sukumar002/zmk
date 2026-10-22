@@ -11,10 +11,10 @@
 static lv_obj_t *keyboard_icon;
 static lv_obj_t *keyboard_number;
 static lv_color_t keyboard_icon_buffer[LV_CANVAS_BUF_SIZE(
-    12, 8, LV_COLOR_FORMAT_GET_BPP(LV_COLOR_FORMAT_L8), LV_DRAW_BUF_STRIDE_ALIGN)];
+    8, 8, LV_COLOR_FORMAT_GET_BPP(LV_COLOR_FORMAT_L8), LV_DRAW_BUF_STRIDE_ALIGN)];
 static uint8_t last_name_board;
 static lv_obj_t *keyboard_name;
-static lv_obj_t *battery_rows[4];
+static lv_obj_t *battery_rows[2];
 static struct k_work_delayable hide_name_work;
 static struct k_work refresh_work;
 K_MUTEX_DEFINE(state_mutex);
@@ -34,26 +34,25 @@ static void render_status(struct k_work *work) {
     }
     k_mutex_lock(&state_mutex, K_FOREVER);
     uint8_t board = active_board_id;
-    int levels[4] = {battery_levels[1][1], battery_levels[1][2], battery_levels[2][1],
-                     battery_levels[2][2]};
+    int levels[2] = {battery_levels[board][1], battery_levels[board][2]};
     bool name_visible = show_name;
     k_mutex_unlock(&state_mutex);
 
     char icon_text[12];
     lv_canvas_fill_bg(keyboard_icon, lv_color_black(), LV_OPA_TRANSP);
-    for (int x = 0; x < 12; x++) {
+    for (int x = 0; x < 8; x++) {
         lv_canvas_set_px(keyboard_icon, x, 0, lv_color_white(), LV_OPA_COVER);
         lv_canvas_set_px(keyboard_icon, x, 7, lv_color_white(), LV_OPA_COVER);
     }
     for (int y = 1; y < 7; y++) {
         lv_canvas_set_px(keyboard_icon, 0, y, lv_color_white(), LV_OPA_COVER);
-        lv_canvas_set_px(keyboard_icon, 11, y, lv_color_white(), LV_OPA_COVER);
+        lv_canvas_set_px(keyboard_icon, 7, y, lv_color_white(), LV_OPA_COVER);
     }
-    for (int x = 2; x <= 9; x += 2) {
+    for (int x = 1; x <= 5; x += 2) {
         lv_canvas_set_px(keyboard_icon, x, 2, lv_color_white(), LV_OPA_COVER);
         lv_canvas_set_px(keyboard_icon, x, 4, lv_color_white(), LV_OPA_COVER);
     }
-    for (int x = 3; x <= 8; x++) {
+    for (int x = 2; x <= 5; x++) {
         lv_canvas_set_px(keyboard_icon, x, 6, lv_color_white(), LV_OPA_COVER);
     }
     snprintk(icon_text, sizeof(icon_text), "%u", board);
@@ -63,17 +62,12 @@ static void render_status(struct k_work *work) {
         zmk_widget_timeout_status_show_keyboard_name(board == 1 ? "Hana" : "Chocofi");
         last_name_board = board;
     }
-    for (int i = 0; i < 4; i++) {
-        char text[16];
-        uint8_t battery_board = (i < 2) ? 1 : 2;
-        uint8_t battery_side = (i % 2) + 1;
-        const char *name = battery_board == 1 ? "H" : "C";
-        const char *side = battery_side == 1 ? "L" : "R";
+    for (int i = 0; i < 2; i++) {
+        char text[12];
         if (levels[i] >= 0 && levels[i] <= 100) {
-            snprintk(text, sizeof(text), "%s%s " LV_SYMBOL_BATTERY_3 " %u%%", name, side,
-                     levels[i]);
+            snprintk(text, sizeof(text), LV_SYMBOL_BATTERY_3 " %u", levels[i]);
         } else {
-            snprintk(text, sizeof(text), "%s%s " LV_SYMBOL_BATTERY_3 " --", name, side);
+            snprintk(text, sizeof(text), LV_SYMBOL_BATTERY_3 " --");
         }
         if (battery_rows[i]) {
             lv_label_set_text(battery_rows[i], text);
@@ -97,13 +91,13 @@ void zmk_universal_oled_status_init(lv_obj_t *parent, lv_obj_t *timeout_obj) {
         state_initialized = true;
     }
     keyboard_icon = lv_canvas_create(parent);
-    lv_canvas_set_buffer(keyboard_icon, keyboard_icon_buffer, 12, 8, LV_COLOR_FORMAT_L8);
+    lv_canvas_set_buffer(keyboard_icon, keyboard_icon_buffer, 8, 8, LV_COLOR_FORMAT_L8);
     lv_obj_align(keyboard_icon, LV_ALIGN_TOP_LEFT, 36, 0);
     keyboard_number = lv_label_create(parent);
     lv_obj_align_to(keyboard_number, keyboard_icon, LV_ALIGN_OUT_RIGHT_MID, 2, 0);
     keyboard_name = lv_label_create(parent);
     lv_obj_add_flag(keyboard_name, LV_OBJ_FLAG_HIDDEN);
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 2; i++) {
         battery_rows[i] = lv_label_create(parent);
         lv_obj_align(battery_rows[i], LV_ALIGN_TOP_RIGHT, 0, i * 10);
     }
