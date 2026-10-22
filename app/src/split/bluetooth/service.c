@@ -248,9 +248,9 @@ int zmk_split_bt_request_universal_switch(uint8_t target_board) {
     /* Locate by UUID; do not rely on attribute indices that vary with Kconfig. */
     for (size_t i = 0; i < split_svc.attr_count; i++) {
         if (bt_uuid_cmp(split_svc.attrs[i].uuid,
-                        BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_UNIVERSAL_SWITCH_REQUEST_UUID)) == 0) {
-            int err = bt_gatt_notify(NULL, &split_svc.attrs[i],
-                                     &universal_switch_request_target,
+                        BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_UNIVERSAL_SWITCH_REQUEST_UUID)) ==
+            0) {
+            int err = bt_gatt_notify(NULL, &split_svc.attrs[i], &universal_switch_request_target,
                                      sizeof(universal_switch_request_target));
             if (err) {
                 LOG_WRN("Failed to notify universal switch request (%d)", err);
