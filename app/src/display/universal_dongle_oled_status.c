@@ -10,7 +10,8 @@
 
 static lv_obj_t *keyboard_icon;
 static lv_obj_t *keyboard_number;
-static lv_color_t keyboard_icon_buffer[LV_CANVAS_BUF_SIZE(12, 8, LV_COLOR_FORMAT_GET_BPP(LV_COLOR_FORMAT_L8), LV_DRAW_BUF_STRIDE_ALIGN)];
+static lv_color_t keyboard_icon_buffer[LV_CANVAS_BUF_SIZE(
+    12, 8, LV_COLOR_FORMAT_GET_BPP(LV_COLOR_FORMAT_L8), LV_DRAW_BUF_STRIDE_ALIGN)];
 static uint8_t last_name_board;
 static lv_obj_t *keyboard_name;
 static lv_obj_t *battery_rows[4];
@@ -33,7 +34,8 @@ static void render_status(struct k_work *work) {
     }
     k_mutex_lock(&state_mutex, K_FOREVER);
     uint8_t board = active_board_id;
-    int levels[4] = {battery_levels[1][1], battery_levels[1][2], battery_levels[2][1], battery_levels[2][2]};
+    int levels[4] = {battery_levels[1][1], battery_levels[1][2], battery_levels[2][1],
+                     battery_levels[2][2]};
     bool name_visible = show_name;
     k_mutex_unlock(&state_mutex);
 
@@ -68,7 +70,8 @@ static void render_status(struct k_work *work) {
         const char *name = battery_board == 1 ? "H" : "C";
         const char *side = battery_side == 1 ? "L" : "R";
         if (levels[i] >= 0 && levels[i] <= 100) {
-            snprintk(text, sizeof(text), "%s%s " LV_SYMBOL_BATTERY_3 " %u%%", name, side, levels[i]);
+            snprintk(text, sizeof(text), "%s%s " LV_SYMBOL_BATTERY_3 " %u%%", name, side,
+                     levels[i]);
         } else {
             snprintk(text, sizeof(text), "%s%s " LV_SYMBOL_BATTERY_3 " --", name, side);
         }
