@@ -768,6 +768,9 @@ static uint8_t split_central_notify_func(struct bt_conn *conn,
         slot->position_state[i] = ((uint8_t *)data)[i];
     }
     LOG_HEXDUMP_DBG(slot->position_state, POSITION_STATE_DATA_LEN, "data");
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    universal_check_qp_switch_combo();
+#endif
 
     for (int i = 0; i < POSITION_STATE_DATA_LEN; i++) {
         for (int j = 0; j < 8; j++) {
