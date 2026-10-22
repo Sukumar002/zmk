@@ -4,7 +4,6 @@
 #include <lvgl.h>
 #include <zmk/display.h>
 #include <zmk/universal_dongle_oled_status.h>
-#include "timeout_status.h"
 
 #define UD_OLED_UNKNOWN (-1)
 #define UD_OLED_NAME_MS 2500
@@ -71,7 +70,7 @@ static void render_status(struct k_work *work) {
         if (levels[i] >= 0 && levels[i] <= 100) {
             snprintk(text, sizeof(text), "%s%s " LV_SYMBOL_BATTERY_3 " %u%%", name, side, levels[i]);
         } else {
-            snprintk(text, sizeof(text), "%s%s --", name, side);
+            snprintk(text, sizeof(text), "%s%s " LV_SYMBOL_BATTERY_3 " --", name, side);
         }
         if (battery_rows[i]) {
             lv_label_set_text(battery_rows[i], text);
