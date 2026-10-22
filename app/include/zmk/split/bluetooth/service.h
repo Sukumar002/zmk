@@ -37,3 +37,6 @@ struct zmk_split_input_event_payload {
     uint32_t value;
     uint8_t sync;
 } __packed;
+
+/* Dedicated authenticated profile-switch request, separate from key positions. */
+int zmk_split_bt_request_universal_switch(uint8_t target_board);
