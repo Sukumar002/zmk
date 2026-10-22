@@ -152,6 +152,8 @@ static bool is_enabled;
 
 static struct peripheral_slot peripherals[ZMK_SPLIT_BLE_PERIPHERAL_COUNT];
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+/* Queued events belong to a connection generation, not just a reusable slot. */
+static uint32_t universal_slot_generation[ZMK_SPLIT_BLE_PERIPHERAL_COUNT];
 /* These state models are keyed by validated logical identity, never BLE slot order. */
 static struct ud_router universal_router;
 static struct ud_onboarding universal_onboarding;
@@ -278,6 +280,9 @@ static const struct bt_uuid_128 split_service_uuid = BT_UUID_INIT_128(ZMK_SPLIT_
 
 struct peripheral_event_wrapper {
     uint8_t source;
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    uint32_t generation;
+#endif
     struct zmk_split_transport_peripheral_event event;
 };
 
@@ -410,8 +415,9 @@ int release_peripheral_slot(int index) {
         bt_conn_unref(slot->conn);
         slot->conn = NULL;
     }
-    slot->state = PERIPHERAL_SLOT_STATE_OPEN;
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    /* Keep the slot unavailable until old-position releases are queued. */
+    uint32_t released_generation = universal_slot_generation[index];
     /* Never carry a prior connection's identity into a newly allocated slot. */
     slot->identity_valid = false;
     slot->identity_read_in_progress = false;
@@ -427,6 +433,9 @@ int release_peripheral_slot(int index) {
                 uint32_t position = (i * 8) + j;
                 struct peripheral_event_wrapper ev = {
                     .source = index,
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+                    .generation = released_generation,
+#endif
                     .event = {.type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT,
                               .data = {.key_position_event = {
                                            .position = position,
@@ -443,6 +452,14 @@ int release_peripheral_slot(int index) {
         slot->position_state[i] = 0U;
         slot->changed_positions[i] = 0U;
     }
+
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    /* New connection events must not be confused with queued old presses.
+     * Synthetic releases above retain the previous generation and stay ahead
+     * of any events from the next connection in the FIFO queue. */
+    universal_slot_generation[index]++;
+#endif
+    slot->state = PERIPHERAL_SLOT_STATE_OPEN;
 
     // Clean up previously discovered handles;
     slot->subscribe_params.value_handle = 0;
@@ -789,8 +806,14 @@ static uint8_t split_central_notify_func(struct bt_conn *conn,
             if (slot->changed_positions[i] & BIT(j)) {
                 uint32_t position = (i * 8) + j;
                 bool pressed = slot->position_state[i] & BIT(j);
+                int source = peripheral_slot_index_for_conn(conn);
                 struct peripheral_event_wrapper ev = {
-                    .source = peripheral_slot_index_for_conn(conn),
+                    .source = source,
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+                    .generation = source >= 0 && source < ARRAY_SIZE(universal_slot_generation)
+                                     ? universal_slot_generation[source]
+                                     : 0,
+#endif
                     .event = {.type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT,
                               .data = {.key_position_event = {
                                            .position = position,
