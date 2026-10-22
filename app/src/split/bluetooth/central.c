@@ -36,6 +36,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/physical_layouts.h>
 #include <zmk/universal_router.h>
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+#include <zmk/universal_dongle_oled_status.h>
+#endif
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
 #include <zmk/keymap.h>
 #include <zmk/universal_onboarding.h>
 #endif
@@ -218,11 +221,15 @@ static int universal_activate_profile_layer(enum ud_board board) {
         return -EAGAIN;
     }
 
+    bool newly_selected = !universal_profile_layer_selected || universal_profile_layer_board != board;
     (void)zmk_keymap_layer_to(layer, false);
     universal_profile_layer_selected = true;
     universal_profile_layer_board = board;
     universal_router.idle = false;
     k_mutex_unlock(&universal_router_mutex);
+    if (newly_selected) {
+        zmk_universal_oled_status_set_active((uint8_t)(board + 1));
+    }
     return 0;
 }
 
@@ -269,6 +276,7 @@ static void universal_complete_switch_if_drained(void) {
     universal_profile_layer_selected = true;
     universal_profile_layer_board = target;
     k_mutex_unlock(&universal_router_mutex);
+    zmk_universal_oled_status_set_active((uint8_t)(target + 1));
     LOG_INF("Universal active keyboard changed to board %u", target);
 }
 
@@ -854,6 +862,11 @@ static uint8_t split_central_battery_level_notify_func(struct bt_conn *conn,
     LOG_DBG("[BATTERY LEVEL NOTIFICATION] data %p length %u", data, length);
     uint8_t battery_level = ((uint8_t *)data)[0];
     LOG_DBG("Battery level: %u", battery_level);
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    if (slot->identity_valid) {
+        zmk_universal_oled_status_set_battery(slot->identity[1], slot->identity[2], battery_level);
+    }
+#endif
 
     struct peripheral_event_wrapper ev = {
         .source = peripheral_slot_index_for_conn(conn),
@@ -898,6 +911,11 @@ static uint8_t split_central_battery_level_read_func(struct bt_conn *conn, uint8
     uint8_t battery_level = ((uint8_t *)data)[0];
 
     LOG_DBG("Battery level: %u", battery_level);
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    if (slot->identity_valid) {
+        zmk_universal_oled_status_set_battery(slot->identity[1], slot->identity[2], battery_level);
+    }
+#endif
 
     struct peripheral_event_wrapper ev = {
         .source = peripheral_slot_index_for_conn(conn),
@@ -1460,6 +1478,7 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
         uint8_t logical_slot = identity_slot->logical_slot;
         k_mutex_lock(&universal_router_mutex, K_FOREVER);
         (void)ud_connected(&universal_router, logical_slot, false);
+        zmk_universal_oled_status_set_battery(identity_slot->identity[1], identity_slot->identity[2], -1);
         if ((enum ud_board)(identity_slot->identity[1] - 1) == universal_router.active &&
             ud_connected_count(&universal_router, universal_router.active) < 2) {
             /* Fail closed until a complete, safely selected pair is available. */
