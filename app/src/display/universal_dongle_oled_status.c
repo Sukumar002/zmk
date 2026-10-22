@@ -12,6 +12,7 @@ static lv_obj_t *keyboard_icon;
 static lv_obj_t *keyboard_name;
 static lv_obj_t *battery_left;
 static lv_obj_t *battery_right;
+static lv_obj_t *timeout_status_obj;
 static struct k_work_delayable hide_name_work;
 static struct k_work refresh_work;
 K_MUTEX_DEFINE(state_mutex);
@@ -40,6 +41,9 @@ static void render_status(struct k_work *work) {
     snprintk(icon_text, sizeof(icon_text), LV_SYMBOL_KEYBOARD " %u", board);
     lv_label_set_text(keyboard_icon, icon_text);
     lv_label_set_text(keyboard_name, name_visible ? (board == 1 ? "Hana" : "Chocofi") : "");
+    if (name_visible && timeout_status_obj) {
+        lv_obj_add_flag(timeout_status_obj, LV_OBJ_FLAG_HIDDEN);
+    }
     char left_text[12], right_text[12];
     if (left >= 0 && left <= 100) {
         snprintk(left_text, sizeof(left_text), LV_SYMBOL_BATTERY_3 " %u%%", left);
@@ -63,7 +67,8 @@ static void hide_name_work_cb(struct k_work *work) {
     k_work_submit_to_queue(zmk_display_work_q(), &refresh_work);
 }
 
-void zmk_universal_oled_status_init(lv_obj_t *parent) {
+void zmk_universal_oled_status_init(lv_obj_t *parent, lv_obj_t *timeout_obj) {
+    timeout_status_obj = timeout_obj;
     if (!state_initialized) {
         k_work_init(&refresh_work, render_status);
         k_work_init_delayable(&hide_name_work, hide_name_work_cb);
