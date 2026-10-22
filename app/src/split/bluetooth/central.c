@@ -1085,7 +1085,8 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
     bool subscribed = slot->run_behavior_handle && slot->subscribe_params.value_handle &&
                       slot->selected_physical_layout_handle;
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
-    subscribed = subscribed && slot->identity_handle;
+    subscribed = subscribed && slot->identity_handle &&
+                 slot->universal_switch_subscribe_params.value_handle;
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
 
 #if ZMK_KEYMAP_HAS_SENSORS
