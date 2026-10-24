@@ -696,6 +696,7 @@ static uint8_t split_central_identity_read_func(struct bt_conn *conn, uint8_t er
 
     slot->logical_slot = logical_slot;
     slot->identity_valid = true;
+    zmk_universal_oled_status_set_connected(slot->identity[1], slot->identity[2], true);
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
     /* Battery discovery can finish before encrypted identity validation. Re-read
      * now that this connection's board/side identity is trusted. */
@@ -1487,6 +1488,8 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
     struct peripheral_slot *identity_slot = peripheral_slot_for_conn(conn);
     if (identity_slot && identity_slot->identity_valid) {
         uint8_t logical_slot = identity_slot->logical_slot;
+        zmk_universal_oled_status_set_connected(identity_slot->identity[1],
+                                                identity_slot->identity[2], false);
         k_mutex_lock(&universal_router_mutex, K_FOREVER);
         (void)ud_connected(&universal_router, logical_slot, false);
         if ((enum ud_board)(identity_slot->identity[1] - 1) == universal_router.active &&
