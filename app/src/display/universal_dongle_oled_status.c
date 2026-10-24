@@ -120,8 +120,17 @@ static void render_status(struct k_work *work) {
     }
     k_mutex_lock(&state_mutex, K_FOREVER);
     uint8_t board = active_board_id;
-    int levels[2] = {battery_levels[board][1], battery_levels[board][2]};
     bool pair_connected = peripheral_connected[board][1] && peripheral_connected[board][2];
+    if (!pair_connected) {
+        uint8_t alternate_board = board == 1 ? 2 : 1;
+        bool alternate_pair_connected =
+            peripheral_connected[alternate_board][1] && peripheral_connected[alternate_board][2];
+        if (alternate_pair_connected) {
+            board = alternate_board;
+            pair_connected = true;
+        }
+    }
+    int levels[2] = {battery_levels[board][1], battery_levels[board][2]};
     k_mutex_unlock(&state_mutex);
 
     if (pair_connected) {
