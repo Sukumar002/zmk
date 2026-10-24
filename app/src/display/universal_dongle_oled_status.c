@@ -133,7 +133,11 @@ static void render_status(struct k_work *work) {
             pair_connected = true;
         }
     }
-    int levels[2] = {battery_levels[board][1], battery_levels[board][2]};
+    int levels[2] = {UD_OLED_UNKNOWN, UD_OLED_UNKNOWN};
+    if (pair_connected) {
+        levels[0] = battery_levels[board][1];
+        levels[1] = battery_levels[board][2];
+    }
     bool show_keyboard_name = pair_connected && show_name && last_name_board != board;
     if (show_keyboard_name) {
         last_name_board = board;
@@ -159,7 +163,7 @@ static void render_status(struct k_work *work) {
         if (levels[i] >= 0 && levels[i] <= 100) {
             snprintk(text, sizeof(text), "%d%%", levels[i]);
         } else {
-            snprintk(text, sizeof(text), "--");
+            snprintk(text, sizeof(text), "-");
         }
         if (battery_rows[i]) {
             lv_label_set_text(battery_rows[i], text);
