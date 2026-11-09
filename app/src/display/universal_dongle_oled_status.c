@@ -7,7 +7,6 @@
 
 #define UD_OLED_UNKNOWN (-1)
 #define UD_OLED_NAME_MS 2500
-#define UD_OLED_NAME_MS 2500
 static uint8_t last_name_board;
 
 #if !IS_ENABLED(CONFIG_ZMK_DONGLE_DISPLAY_COMPACT_128X32)
