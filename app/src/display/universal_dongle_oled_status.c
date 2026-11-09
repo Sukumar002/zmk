@@ -7,6 +7,10 @@
 
 #define UD_OLED_UNKNOWN (-1)
 #define UD_OLED_NAME_MS 2500
+#define UD_OLED_NAME_MS 2500
+static uint8_t last_name_board;
+
+#if !IS_ENABLED(CONFIG_ZMK_DONGLE_DISPLAY_COMPACT_128X32)
 #define UD_KEYBOARD_ICON_W 21
 #define UD_KEYBOARD_ICON_H 14
 #define UD_KEYBOARD_SOURCE_W 12
@@ -19,13 +23,13 @@ static lv_obj_t *keyboard_number;
 static uint8_t keyboard_icon_buffer[LV_CANVAS_BUF_SIZE(
     UD_KEYBOARD_ICON_W, UD_KEYBOARD_ICON_H, LV_COLOR_FORMAT_GET_BPP(LV_COLOR_FORMAT_L8),
     LV_DRAW_BUF_STRIDE_ALIGN)];
-static uint8_t last_name_board;
 static lv_obj_t *keyboard_name;
 static lv_obj_t *battery_rows[2];
 static lv_obj_t *battery_icons[2];
 static uint8_t battery_icon_buffers[2][LV_CANVAS_BUF_SIZE(
     UD_BATTERY_ICON_W, UD_BATTERY_ICON_H, LV_COLOR_FORMAT_GET_BPP(LV_COLOR_FORMAT_L8),
     LV_DRAW_BUF_STRIDE_ALIGN)];
+#endif
 static struct k_work_delayable hide_name_work;
 static struct k_work refresh_work;
 K_MUTEX_DEFINE(state_mutex);
@@ -38,6 +42,7 @@ static int battery_levels[3][3] = {
 };
 static bool show_name;
 
+#if !IS_ENABLED(CONFIG_ZMK_DONGLE_DISPLAY_COMPACT_128X32)
 static bool keyboard_source_pixel(int x, int y) {
     if (x == 0 || x == UD_KEYBOARD_SOURCE_W - 1 ||
         y == 0 || y == UD_KEYBOARD_SOURCE_H - 1) {
@@ -115,6 +120,7 @@ static void draw_battery_icon(int index, int level) {
 
     lv_canvas_finish_layer(canvas, &layer);
 }
+#endif /* !CONFIG_ZMK_DONGLE_DISPLAY_COMPACT_128X32 */
 
 static void render_status(struct k_work *work) {
     ARG_UNUSED(work);
@@ -124,8 +130,10 @@ static void render_status(struct k_work *work) {
 
     k_mutex_lock(&state_mutex, K_FOREVER);
     uint8_t board = active_board_id;
-    int levels[2] = {battery_levels[board][1], battery_levels[board][2]};
     bool name_visible = show_name;
+#if !IS_ENABLED(CONFIG_ZMK_DONGLE_DISPLAY_COMPACT_128X32)
+    int levels[2] = {battery_levels[board][1], battery_levels[board][2]};
+#endif
     k_mutex_unlock(&state_mutex);
 
 #if !IS_ENABLED(CONFIG_ZMK_DONGLE_DISPLAY_COMPACT_128X32)
