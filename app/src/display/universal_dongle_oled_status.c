@@ -118,24 +118,33 @@ static void draw_battery_icon(int index, int level) {
 
 static void render_status(struct k_work *work) {
     ARG_UNUSED(work);
-    if (!state_initialized || !keyboard_icon || !keyboard_name) {
+    if (!state_initialized) {
         return;
     }
+
     k_mutex_lock(&state_mutex, K_FOREVER);
     uint8_t board = active_board_id;
     int levels[2] = {battery_levels[board][1], battery_levels[board][2]};
     bool name_visible = show_name;
     k_mutex_unlock(&state_mutex);
 
+#if !IS_ENABLED(CONFIG_ZMK_DONGLE_DISPLAY_COMPACT_128X32)
+    if (!keyboard_icon || !keyboard_name) {
+        return;
+    }
     draw_keyboard_icon();
     char icon_text[12];
     snprintk(icon_text, sizeof(icon_text), "%u", board);
     lv_label_set_text(keyboard_number, icon_text);
     lv_label_set_text(keyboard_name, "");
+#endif
+
     if (name_visible && last_name_board != board) {
         zmk_widget_timeout_status_show_keyboard_name(board == 1 ? "HANA" : "CHOCOFI");
         last_name_board = board;
     }
+
+#if !IS_ENABLED(CONFIG_ZMK_DONGLE_DISPLAY_COMPACT_128X32)
     for (int i = 0; i < 2; i++) {
         char text[8];
         if (levels[i] >= 0 && levels[i] <= 100) {
@@ -150,6 +159,7 @@ static void render_status(struct k_work *work) {
             draw_battery_icon(i, levels[i]);
         }
     }
+#endif
 }
 
 static void hide_name_work_cb(struct k_work *work) {
@@ -167,11 +177,12 @@ void zmk_universal_oled_status_init(lv_obj_t *parent, lv_obj_t *timeout_obj) {
         k_work_init_delayable(&hide_name_work, hide_name_work_cb);
         state_initialized = true;
     }
+
+#if !IS_ENABLED(CONFIG_ZMK_DONGLE_DISPLAY_COMPACT_128X32)
     keyboard_icon = lv_canvas_create(parent);
     lv_canvas_set_buffer(keyboard_icon, keyboard_icon_buffer, UD_KEYBOARD_ICON_W,
                          UD_KEYBOARD_ICON_H, LV_COLOR_FORMAT_L8);
-    /* The BT/USB status glyphs use a 16px top row; center the 14px
-     * keyboard glyph vertically within that same row. */
+    /* Center the 14px keyboard glyph vertically within the 16px top row. */
     lv_obj_align(keyboard_icon, LV_ALIGN_TOP_LEFT, 36, 1);
     keyboard_number = lv_label_create(parent);
     lv_obj_align_to(keyboard_number, keyboard_icon, LV_ALIGN_OUT_RIGHT_MID, 2, 0);
@@ -188,13 +199,15 @@ void zmk_universal_oled_status_init(lv_obj_t *parent, lv_obj_t *timeout_obj) {
                              UD_BATTERY_ICON_H, LV_COLOR_FORMAT_L8);
         lv_obj_align(battery_icons[i], LV_ALIGN_TOP_RIGHT, 0, i * 10);
     }
-    k_work_submit_to_queue(zmk_display_work_q(), &refresh_work);
+#endif
+
+    /* Show the active keyboard identity once on every cold start. */
     k_mutex_lock(&state_mutex, K_FOREVER);
-    bool name_was_requested = show_name;
+    show_name = true;
     k_mutex_unlock(&state_mutex);
-    if (name_was_requested) {
-        k_work_reschedule_for_queue(zmk_display_work_q(), &hide_name_work, K_MSEC(UD_OLED_NAME_MS));
-    }
+
+    k_work_submit_to_queue(zmk_display_work_q(), &refresh_work);
+    k_work_reschedule_for_queue(zmk_display_work_q(), &hide_name_work, K_MSEC(UD_OLED_NAME_MS));
 }
 
 void zmk_universal_oled_status_set_active(uint8_t board_id) {
