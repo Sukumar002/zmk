@@ -9,6 +9,14 @@ menuconfig ZMK_DISPLAY
 
 if ZMK_DISPLAY
 
+config ZMK_UNIVERSAL_OLED_TEXT_BATTERY
+    bool "Use physical L/R text labels for universal dongle batteries"
+    default n
+    help
+      Display battery levels as L 00 / R 00 text rows instead of battery glyphs.
+      Physical side labels come from the validated universal peripheral identity.
+      Disabled by default to preserve existing Hana OLED artwork.
+
 config ZMK_DISPLAY_BLANK_ON_IDLE
     bool "Blank display on idle"
     default y if SSD1306
