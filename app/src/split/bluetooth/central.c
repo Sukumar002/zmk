@@ -73,6 +73,12 @@ struct peripheral_slot {
     uint16_t update_hid_indicators;
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
     uint16_t selected_physical_layout_handle;
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY)
+    struct bt_gatt_read_params side_id_read_params;
+    uint16_t side_id_handle;
+    uint8_t side_id;
+    bool side_id_read_in_progress;
+#endif
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
     struct bt_gatt_read_params identity_read_params;
     uint16_t identity_handle;
@@ -419,6 +425,11 @@ int release_peripheral_slot(int index) {
     }
 
     LOG_DBG("Releasing peripheral slot at %d", index);
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY)
+    slot->side_id = 0;
+    slot->side_id_handle = 0;
+    slot->side_id_read_in_progress = false;
+#endif
 
     if (slot->conn != NULL) {
         bt_conn_unref(slot->conn);
@@ -847,6 +858,55 @@ static uint8_t split_central_notify_func(struct bt_conn *conn,
     return BT_GATT_ITER_CONTINUE;
 }
 
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY)
+static uint8_t split_central_side_id_read_func(struct bt_conn *conn, uint8_t err,
+                                               struct bt_gatt_read_params *params,
+                                               const void *data, uint16_t length) {
+    struct peripheral_slot *slot = peripheral_slot_for_conn(conn);
+    if (!slot) return BT_GATT_ITER_STOP;
+    slot->side_id_read_in_progress = false;
+    if (err || !data || length != sizeof(uint8_t)) {
+        LOG_WRN("Could not read split side ID (err %u, length %u)", err, length);
+        return BT_GATT_ITER_STOP;
+    }
+    uint8_t side_id = *(const uint8_t *)data;
+    if (side_id < 1 || side_id > 2) {
+        LOG_WRN("Ignoring invalid split side ID %u", side_id);
+        return BT_GATT_ITER_STOP;
+    }
+    for (int i = 0; i < ZMK_SPLIT_BLE_PERIPHERAL_COUNT; i++) {
+        struct peripheral_slot *other = &peripherals[i];
+        if (other != slot && other->conn && other->side_id == side_id) {
+            LOG_WRN("Ignoring duplicate split side ID %u", side_id);
+            return BT_GATT_ITER_STOP;
+        }
+    }
+    slot->side_id = side_id;
+    LOG_INF("Split peripheral identified as %s", side_id == 1 ? "left" : "right");
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
+    if (slot->batt_lvl_read_params.single.handle) {
+        int battery_err = bt_gatt_read(conn, &slot->batt_lvl_read_params);
+        if (battery_err) LOG_DBG("Battery refresh after side ID failed (%d)", battery_err);
+    }
+#endif
+    return BT_GATT_ITER_STOP;
+}
+static int split_central_start_side_id_read(struct bt_conn *conn, struct peripheral_slot *slot) {
+    if (!conn || !slot || !slot->side_id_handle || slot->side_id ||
+        slot->side_id_read_in_progress) return 0;
+    if (bt_conn_get_security(conn) < BT_SECURITY_L2) return -EACCES;
+    slot->side_id_read_params.func = split_central_side_id_read_func;
+    slot->side_id_read_params.handle_count = 1;
+    slot->side_id_read_params.single.handle = slot->side_id_handle;
+    slot->side_id_read_params.single.offset = 0;
+    slot->side_id_read_in_progress = true;
+    int err = bt_gatt_read(conn, &slot->side_id_read_params);
+    if (err) slot->side_id_read_in_progress = false;
+    return err;
+}
+#endif
+
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
 
 static uint8_t split_central_battery_level_notify_func(struct bt_conn *conn,
@@ -871,6 +931,9 @@ static uint8_t split_central_battery_level_notify_func(struct bt_conn *conn,
     }
 
     LOG_DBG("[BATTERY LEVEL NOTIFICATION] data %p length %u", data, length);
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY)
+    if (!slot->side_id) return BT_GATT_ITER_CONTINUE;
+#endif
     uint8_t battery_level = ((uint8_t *)data)[0];
     LOG_DBG("Battery level: %u", battery_level);
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
@@ -880,7 +943,11 @@ static uint8_t split_central_battery_level_notify_func(struct bt_conn *conn,
 #endif
 
     struct peripheral_event_wrapper ev = {
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY)
+        .source = slot->side_id - 1,
+#else
         .source = peripheral_slot_index_for_conn(conn),
+#endif
         .event = {.type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_BATTERY_EVENT,
                   .data = {.battery_event = {
                                .level = battery_level,
@@ -920,7 +987,9 @@ static uint8_t split_central_battery_level_read_func(struct bt_conn *conn, uint8
     }
 
     uint8_t battery_level = ((uint8_t *)data)[0];
-
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY)
+    if (!slot->side_id) return BT_GATT_ITER_CONTINUE;
+#endif
     LOG_DBG("Battery level: %u", battery_level);
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
     if (slot->identity_valid) {
@@ -1119,6 +1188,17 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
                 }
             }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
+        } else if (IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY) &&
+                   !bt_uuid_cmp(chrc_uuid, BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SIDE_ID_UUID))) {
+            slot->side_id_handle = bt_gatt_attr_value_handle(attr);
+            if (bt_conn_get_security(conn) < BT_SECURITY_L2) {
+                int security_err = bt_conn_set_security(conn, BT_SECURITY_L2);
+                if (security_err && security_err != -EALREADY)
+                    LOG_WRN("Failed to request encryption for split side ID (%d)", security_err);
+            } else {
+                int side_err = split_central_start_side_id_read(conn, slot);
+                if (side_err) LOG_WRN("Failed to start split side ID read (%d)", side_err);
+            }
         } else if (!bt_uuid_cmp(((struct bt_gatt_chrc *)attr->user_data)->uuid,
                                 BT_UUID_DECLARE_128(ZMK_SPLIT_BT_SELECT_PHYS_LAYOUT_UUID))) {
             LOG_DBG("Found select physical layout handle");
@@ -1538,6 +1618,13 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
 static void split_central_security_changed(struct bt_conn *conn, bt_security_t level,
                                            enum bt_security_err err) {
     struct peripheral_slot *slot = peripheral_slot_for_conn(conn);
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY)
+    if (slot && err == 0 && level >= BT_SECURITY_L2 && slot->side_id_handle && !slot->side_id &&
+        !slot->side_id_read_in_progress) {
+        int side_err = split_central_start_side_id_read(conn, slot);
+        if (side_err) LOG_WRN("Failed to read split side ID after encryption (%d)", side_err);
+    }
+#endif
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
     if (slot && err == 0 && level >= BT_SECURITY_L2 && slot->identity_handle &&
         !slot->identity_valid && !slot->identity_read_in_progress) {
