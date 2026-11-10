@@ -49,6 +49,15 @@ static void split_svc_sensor_state_ccc(const struct bt_gatt_attr *attr, uint16_t
 }
 #endif /* ZMK_KEYMAP_HAS_SENSORS */
 
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_SIDE_IDENTITY)
+static const uint8_t split_side_id = CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_SIDE_ID;
+
+static ssize_t split_svc_side_id(struct bt_conn *conn, const struct bt_gatt_attr *attrs,
+                                 void *buf, uint16_t len, uint16_t offset) {
+    return bt_gatt_attr_read(conn, attrs, buf, len, offset, &split_side_id, sizeof(split_side_id));
+}
+#endif
+
 #define POS_STATE_LEN 16
 
 static uint8_t num_of_positions = ZMK_KEYMAP_LEN;
@@ -206,6 +215,11 @@ BT_GATT_SERVICE_DEFINE(
                            BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ_ENCRYPT,
                            split_svc_pos_state, NULL, &position_state),
     BT_GATT_CCC(split_svc_pos_state_ccc, BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_SIDE_IDENTITY)
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SIDE_ID_UUID),
+                           BT_GATT_CHRC_READ, BT_GATT_PERM_READ_ENCRYPT,
+                           split_svc_side_id, NULL, NULL),
+#endif
     BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_RUN_BEHAVIOR_UUID),
                            BT_GATT_CHRC_WRITE_WITHOUT_RESP, BT_GATT_PERM_WRITE_ENCRYPT, NULL,
                            split_svc_run_behavior, &behavior_run_payload),
