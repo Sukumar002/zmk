@@ -30,6 +30,13 @@ if ZMK_SPLIT_ROLE_CENTRAL
 config ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS
     int "Number of peripherals that will connect to the central."
 
+config ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY
+    bool "Read physical side IDs from split peripherals"
+    default n
+    help
+      Read a side ID from each split peripheral and use it to map battery reports
+      to physical left/right sides. This does not change split BLE connections.
+
 menuconfig ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING
     bool "Fetch Peripheral Battery Level Info"
     help
@@ -77,6 +84,18 @@ config ZMK_SPLIT_BLE_PREF_TIMEOUT
 endif # ZMK_SPLIT_ROLE_CENTRAL
 
 if !ZMK_SPLIT_ROLE_CENTRAL
+
+config ZMK_SPLIT_BLE_PERIPHERAL_SIDE_IDENTITY
+    bool "Expose a physical side ID to the split central"
+    default n
+    help
+      Expose the configured physical side ID as a read-only split GATT characteristic.
+
+config ZMK_SPLIT_BLE_PERIPHERAL_SIDE_ID
+    int "Physical side ID (1=left, 2=right)"
+    range 1 2
+    depends on ZMK_SPLIT_BLE_PERIPHERAL_SIDE_IDENTITY
+    default 1
 
 config ZMK_SPLIT_BLE_PERIPHERAL_STACK_SIZE
     int "BLE split peripheral notify thread stack size"
