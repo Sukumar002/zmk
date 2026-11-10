@@ -14,8 +14,6 @@ static uint8_t last_name_board;
 #define UD_KEYBOARD_ICON_H 14
 #define UD_KEYBOARD_SOURCE_W 12
 #define UD_KEYBOARD_SOURCE_H 8
-#define UD_BATTERY_ICON_W 5
-#define UD_BATTERY_ICON_H 8
 
 static lv_obj_t *keyboard_icon;
 static lv_obj_t *keyboard_number;
@@ -24,10 +22,14 @@ static uint8_t keyboard_icon_buffer[LV_CANVAS_BUF_SIZE(
     LV_DRAW_BUF_STRIDE_ALIGN)];
 static lv_obj_t *keyboard_name;
 static lv_obj_t *battery_rows[2];
+#if !IS_ENABLED(CONFIG_ZMK_UNIVERSAL_OLED_TEXT_BATTERY)
+#define UD_BATTERY_ICON_W 5
+#define UD_BATTERY_ICON_H 8
 static lv_obj_t *battery_icons[2];
 static uint8_t battery_icon_buffers[2][LV_CANVAS_BUF_SIZE(
     UD_BATTERY_ICON_W, UD_BATTERY_ICON_H, LV_COLOR_FORMAT_GET_BPP(LV_COLOR_FORMAT_L8),
     LV_DRAW_BUF_STRIDE_ALIGN)];
+#endif
 #endif
 static struct k_work_delayable hide_name_work;
 static struct k_work refresh_work;
@@ -75,6 +77,7 @@ static void draw_keyboard_icon(void) {
     }
 }
 
+#if !IS_ENABLED(CONFIG_ZMK_UNIVERSAL_OLED_TEXT_BATTERY)
 /*
  * Pixel battery glyph based on the established Hana OLED battery artwork.
  * Match the original Hana v2.2 5x8 battery artwork and its percentage bands.
@@ -119,6 +122,7 @@ static void draw_battery_icon(int index, int level) {
 
     lv_canvas_finish_layer(canvas, &layer);
 }
+#endif /* !CONFIG_ZMK_UNIVERSAL_OLED_TEXT_BATTERY */
 #endif /* !CONFIG_ZMK_DONGLE_DISPLAY_COMPACT_128X32 */
 
 static void render_status(struct k_work *work) {
@@ -154,6 +158,19 @@ static void render_status(struct k_work *work) {
 #if !IS_ENABLED(CONFIG_ZMK_DONGLE_DISPLAY_COMPACT_128X32)
     for (int i = 0; i < 2; i++) {
         char text[8];
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_OLED_TEXT_BATTERY)
+        const char side = i == 0 ? 'L' : 'R';
+        if (levels[i] >= 0 && levels[i] < 100) {
+            snprintk(text, sizeof(text), "%c %02d", side, levels[i]);
+        } else if (levels[i] == 100) {
+            snprintk(text, sizeof(text), "%c100", side);
+        } else {
+            snprintk(text, sizeof(text), "%c --", side);
+        }
+        if (battery_rows[i]) {
+            lv_label_set_text(battery_rows[i], text);
+        }
+#else
         if (levels[i] >= 0 && levels[i] <= 100) {
             snprintk(text, sizeof(text), "%d%%", levels[i]);
         } else {
@@ -165,6 +182,7 @@ static void render_status(struct k_work *work) {
         if (battery_icons[i]) {
             draw_battery_icon(i, levels[i]);
         }
+#endif
     }
 #endif
 }
@@ -198,6 +216,12 @@ void zmk_universal_oled_status_init(lv_obj_t *parent, lv_obj_t *timeout_obj) {
 
     for (int i = 0; i < 2; i++) {
         battery_rows[i] = lv_label_create(parent);
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_OLED_TEXT_BATTERY)
+        /* Four fixed-width characters: L 00 / R100, flush to the top-right edge. */
+        lv_obj_set_width(battery_rows[i], 36);
+        lv_obj_set_style_text_align(battery_rows[i], LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+        lv_obj_align(battery_rows[i], LV_ALIGN_TOP_RIGHT, -2, i * 10);
+#else
         lv_obj_set_width(battery_rows[i], 29);
         lv_obj_set_style_text_align(battery_rows[i], LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
         lv_obj_align(battery_rows[i], LV_ALIGN_TOP_RIGHT, -8, i * 10);
@@ -205,6 +229,7 @@ void zmk_universal_oled_status_init(lv_obj_t *parent, lv_obj_t *timeout_obj) {
         lv_canvas_set_buffer(battery_icons[i], battery_icon_buffers[i], UD_BATTERY_ICON_W,
                              UD_BATTERY_ICON_H, LV_COLOR_FORMAT_L8);
         lv_obj_align(battery_icons[i], LV_ALIGN_TOP_RIGHT, 0, i * 10);
+#endif
     }
 #endif
 
