@@ -998,7 +998,11 @@ static uint8_t split_central_battery_level_read_func(struct bt_conn *conn, uint8
 #endif
 
     struct peripheral_event_wrapper ev = {
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY)
+        .source = slot->side_id - 1,
+#else
         .source = peripheral_slot_index_for_conn(conn),
+#endif
         .event = {.type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_BATTERY_EVENT,
                   .data = {.battery_event = {
                                .level = battery_level,
@@ -1584,15 +1588,24 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
     LOG_DBG("Disconnected: %s (reason %d)", addr, reason);
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY)
+    struct peripheral_slot *side_slot = peripheral_slot_for_conn(conn);
+    if (side_slot && side_slot->side_id) {
+        struct peripheral_event_wrapper ev = {
+            .source = side_slot->side_id - 1,
+            .event = {.type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_BATTERY_EVENT,
+                      .data = {.battery_event = {.level = 0}}}};
+        k_msgq_put(&peripheral_event_msgq, &ev, K_NO_WAIT);
+        k_work_submit(&peripheral_event_work);
+    }
+#else
     struct peripheral_event_wrapper ev = {
         .source = peripheral_slot_index_for_conn(conn),
         .event = {.type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_BATTERY_EVENT,
-                  .data = {.battery_event = {
-                               .level = 0,
-                           }}}};
-
+                  .data = {.battery_event = {.level = 0}}}};
     k_msgq_put(&peripheral_event_msgq, &ev, K_NO_WAIT);
     k_work_submit(&peripheral_event_work);
+#endif
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
 
 #if IS_ENABLED(CONFIG_ZMK_INPUT_SPLIT)
