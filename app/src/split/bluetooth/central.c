@@ -1594,7 +1594,7 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
         struct peripheral_event_wrapper ev = {
             .source = side_slot->side_id - 1,
             .event = {.type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_BATTERY_EVENT,
-                      .data = {.battery_event = {.level = 0}}}};
+                      .data = {.battery_event = {.level = UINT8_MAX}}}};
         k_msgq_put(&peripheral_event_msgq, &ev, K_NO_WAIT);
         k_work_submit(&peripheral_event_work);
     }
@@ -1602,7 +1602,7 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
     struct peripheral_event_wrapper ev = {
         .source = peripheral_slot_index_for_conn(conn),
         .event = {.type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_BATTERY_EVENT,
-                  .data = {.battery_event = {.level = 0}}}};
+                  .data = {.battery_event = {.level = UINT8_MAX}}}};
     k_msgq_put(&peripheral_event_msgq, &ev, K_NO_WAIT);
     k_work_submit(&peripheral_event_work);
 #endif
