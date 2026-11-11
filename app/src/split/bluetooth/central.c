@@ -1192,8 +1192,8 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
                 }
             }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
-        } else if (IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY) &&
-                   !bt_uuid_cmp(chrc_uuid, BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SIDE_ID_UUID))) {
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY)
+        } else if (!bt_uuid_cmp(chrc_uuid, BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SIDE_ID_UUID))) {
             slot->side_id_handle = bt_gatt_attr_value_handle(attr);
             if (bt_conn_get_security(conn) < BT_SECURITY_L2) {
                 int security_err = bt_conn_set_security(conn, BT_SECURITY_L2);
@@ -1203,6 +1203,7 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
                 int side_err = split_central_start_side_id_read(conn, slot);
                 if (side_err) LOG_WRN("Failed to start split side ID read (%d)", side_err);
             }
+#endif
         } else if (!bt_uuid_cmp(((struct bt_gatt_chrc *)attr->user_data)->uuid,
                                 BT_UUID_DECLARE_128(ZMK_SPLIT_BT_SELECT_PHYS_LAYOUT_UUID))) {
             LOG_DBG("Found select physical layout handle");
