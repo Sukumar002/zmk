@@ -143,8 +143,25 @@ int zmk_endpoint_set_preferred_transport(enum zmk_transport transport) {
 enum zmk_transport zmk_endpoint_get_preferred_transport(void) { return preferred_transport; }
 
 int zmk_endpoint_toggle_preferred_transport(void) {
-    enum zmk_transport new_transport =
-        (preferred_transport == ZMK_TRANSPORT_USB) ? ZMK_TRANSPORT_BLE : ZMK_TRANSPORT_USB;
+    /*
+     * Toggle from the endpoint actually in use. The preferred transport can differ
+     * from the selected endpoint when the preferred host is unavailable and ZMK
+     * has fallen back to the other ready transport.
+     */
+    enum zmk_transport active_transport = current_instance.transport;
+    enum zmk_transport new_transport;
+
+    if (active_transport == ZMK_TRANSPORT_USB) {
+        new_transport = ZMK_TRANSPORT_BLE;
+    } else if (active_transport == ZMK_TRANSPORT_BLE) {
+        new_transport = ZMK_TRANSPORT_USB;
+    } else {
+        new_transport = (preferred_transport == ZMK_TRANSPORT_USB) ? ZMK_TRANSPORT_BLE
+                                                                    : ZMK_TRANSPORT_USB;
+    }
+
+    LOG_INF("Toggling output endpoint from %d (preferred %d) to %d", active_transport,
+            preferred_transport, new_transport);
     return zmk_endpoint_set_preferred_transport(new_transport);
 }
 
