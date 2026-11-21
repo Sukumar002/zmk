@@ -1477,6 +1477,9 @@ static void split_central_device_found(const bt_addr_le_t *addr, int8_t rssi, ui
     }
 }
 
+static void scan_retry_cb(struct k_work *work) { start_scanning(); }
+static K_WORK_DELAYABLE_DEFINE(scan_retry_work, scan_retry_cb);
+
 static int start_scanning(void) {
     if (!is_enabled) {
         LOG_DBG("Not scanning, we're disabled");
@@ -1502,14 +1505,15 @@ static int start_scanning(void) {
         return 0;
     }
 
-    // Start scanning otherwise.
-    is_scanning = true;
+    // Only mark scanning active after the controller accepts the request.
     int err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, split_central_device_found);
-    if (err < 0) {
-        LOG_ERR("Scanning failed to start (err %d)", err);
+    if (err < 0 && err != -EALREADY) {
+        LOG_ERR("Scanning failed to start (err %d); retrying in 1s", err);
+        k_work_schedule(&scan_retry_work, K_SECONDS(1));
         return err;
     }
 
+    is_scanning = true;
     LOG_DBG("Scanning successfully started");
     return 0;
 }
@@ -1607,6 +1611,10 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
 
     k_work_submit(&notify_status_work);
 
+    /* Restart the scan session so its duplicate filter can rediscover a waking peripheral. */
+    if (is_scanning) {
+        stop_scanning();
+    }
     start_scanning();
 }
 
