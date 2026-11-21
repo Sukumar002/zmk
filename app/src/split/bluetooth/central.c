@@ -60,14 +60,17 @@ struct peripheral_slot {
     struct bt_gatt_subscribe_params subscribe_params;
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
     struct bt_gatt_subscribe_params universal_switch_subscribe_params;
+    struct bt_gatt_discover_params universal_switch_sub_discover_params;
     uint16_t universal_switch_request_handle;
 #endif
     struct bt_gatt_subscribe_params sensor_subscribe_params;
     struct bt_gatt_discover_params sub_discover_params;
+    struct bt_gatt_discover_params sensor_sub_discover_params;
     uint16_t run_behavior_handle;
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
     struct bt_gatt_subscribe_params batt_lvl_subscribe_params;
     struct bt_gatt_read_params batt_lvl_read_params;
+    struct bt_gatt_discover_params batt_lvl_sub_discover_params;
 #endif /* IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING) */
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
     uint16_t update_hid_indicators;
@@ -470,13 +473,20 @@ int release_peripheral_slot(int index) {
 #endif
     slot->state = PERIPHERAL_SLOT_STATE_OPEN;
 
-    // Clean up previously discovered handles;
+    // Clean up previously discovered handles and CCC state before reusing this slot.
     slot->subscribe_params.value_handle = 0;
+    slot->subscribe_params.ccc_handle = 0;
+    slot->sensor_subscribe_params.value_handle = 0;
+    slot->sensor_subscribe_params.ccc_handle = 0;
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
     slot->universal_switch_subscribe_params.value_handle = 0;
     slot->universal_switch_subscribe_params.ccc_handle = 0;
     slot->universal_switch_request_handle = 0;
 #endif
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
+    slot->batt_lvl_subscribe_params.value_handle = 0;
+    slot->batt_lvl_subscribe_params.ccc_handle = 0;
+#endif /* IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING) */
     slot->run_behavior_handle = 0;
     slot->selected_physical_layout_handle = 0;
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
@@ -962,6 +972,62 @@ static int split_central_subscribe(struct bt_conn *conn, struct bt_gatt_subscrib
     return err;
 }
 
+/*
+ * Do not start CCC descriptor discovery while the peripheral characteristic walk is active.
+ * Each subscription owns its discovery parameters so one CCC lookup cannot overwrite another.
+ */
+static void split_central_position_subscribed_cb(struct bt_conn *conn, uint8_t err,
+                                                 struct bt_gatt_subscribe_params *params) {
+    ARG_UNUSED(params);
+    if (err) {
+        LOG_ERR("Position-state subscription failed; disconnecting to retry (err %d)", err);
+        bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+    } else {
+        LOG_INF("Position-state subscription established (peripheral %d)",
+                peripheral_slot_index_for_conn(conn));
+    }
+}
+
+static void split_central_flush_subscriptions(struct bt_conn *conn, struct peripheral_slot *slot) {
+    if (slot->subscribe_params.value_handle) {
+        slot->subscribe_params.subscribe = split_central_position_subscribed_cb;
+        int err = split_central_subscribe(conn, &slot->subscribe_params);
+        if (err < 0 && err != -EALREADY) {
+            LOG_ERR("Position-state subscription failed; disconnecting to retry (err %d)", err);
+            bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+            return;
+        }
+    }
+#if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
+    if (slot->universal_switch_subscribe_params.value_handle) {
+        int err = split_central_subscribe(conn, &slot->universal_switch_subscribe_params);
+        if (err < 0 && err != -EALREADY) {
+            LOG_WRN("Could not subscribe to universal switch requests (%d)", err);
+        }
+    }
+#endif
+#if ZMK_KEYMAP_HAS_SENSORS
+    if (slot->sensor_subscribe_params.value_handle) {
+        int err = split_central_subscribe(conn, &slot->sensor_subscribe_params);
+        if (err < 0 && err != -EALREADY) {
+            LOG_WRN("Could not subscribe to peripheral sensor events (%d)", err);
+        }
+    }
+#endif /* ZMK_KEYMAP_HAS_SENSORS */
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
+    if (slot->batt_lvl_subscribe_params.value_handle) {
+        int err = split_central_subscribe(conn, &slot->batt_lvl_subscribe_params);
+        if (err < 0 && err != -EALREADY) {
+            LOG_WRN("Could not subscribe to peripheral battery updates (%d)", err);
+        }
+        err = bt_gatt_read(conn, &slot->batt_lvl_read_params);
+        if (err) {
+            LOG_WRN("Could not read initial peripheral battery level (%d)", err);
+        }
+    }
+#endif /* IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING) */
+}
+
 static int update_peripheral_selected_layout(struct peripheral_slot *slot, uint8_t layout_idx) {
     if (slot->state != PERIPHERAL_SLOT_STATE_CONNECTED) {
         return -ENOTCONN;
@@ -1006,14 +1072,24 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
                                                  const struct bt_gatt_attr *attr,
                                                  struct bt_gatt_discover_params *params) {
     if (!attr) {
-        LOG_DBG("Discover complete");
+        struct peripheral_slot *done_slot = peripheral_slot_for_conn(conn);
 #if IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY)
-        struct peripheral_slot *slot = peripheral_slot_for_conn(conn);
-        if (slot && !slot->identity_handle) {
+        if (done_slot && !done_slot->identity_handle) {
             LOG_WRN("Disconnecting split peripheral without universal identity protocol");
             bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+            return BT_GATT_ITER_STOP;
         }
 #endif /* IS_ENABLED(CONFIG_ZMK_UNIVERSAL_DONGLE_CENTRAL_IDENTITY) */
+        if (done_slot) {
+            if (params->type == BT_GATT_DISCOVER_CHARACTERISTIC &&
+                !done_slot->subscribe_params.value_handle) {
+                LOG_ERR("Position-state characteristic missing; disconnecting to retry discovery");
+                bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+            } else {
+                split_central_flush_subscriptions(conn, done_slot);
+            }
+        }
+        LOG_DBG("Discover complete");
         return BT_GATT_ITER_STOP;
     }
 
@@ -1041,7 +1117,6 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
             slot->subscribe_params.value_handle = bt_gatt_attr_value_handle(attr);
             slot->subscribe_params.notify = split_central_notify_func;
             slot->subscribe_params.value = BT_GATT_CCC_NOTIFY;
-            split_central_subscribe(conn, &slot->subscribe_params);
 #if ZMK_KEYMAP_HAS_SENSORS
         } else if (bt_uuid_cmp(chrc_uuid,
                                BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SENSOR_STATE_UUID)) == 0) {
@@ -1049,12 +1124,11 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
             slot->discover_params.start_handle = attr->handle + 2;
             slot->discover_params.type = BT_GATT_DISCOVER_CHARACTERISTIC;
 
-            slot->sensor_subscribe_params.disc_params = &slot->sub_discover_params;
+            slot->sensor_subscribe_params.disc_params = &slot->sensor_sub_discover_params;
             slot->sensor_subscribe_params.end_handle = slot->discover_params.end_handle;
             slot->sensor_subscribe_params.value_handle = bt_gatt_attr_value_handle(attr);
             slot->sensor_subscribe_params.notify = split_central_sensor_notify_func;
             slot->sensor_subscribe_params.value = BT_GATT_CCC_NOTIFY;
-            split_central_subscribe(conn, &slot->sensor_subscribe_params);
 #endif /* ZMK_KEYMAP_HAS_SENSORS */
 #if IS_ENABLED(CONFIG_ZMK_INPUT_SPLIT)
         } else if (bt_uuid_cmp(chrc_uuid, BT_UUID_DECLARE_128(ZMK_SPLIT_BT_INPUT_EVENT_UUID)) ==
@@ -1089,17 +1163,13 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
                        BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_UNIVERSAL_SWITCH_REQUEST_UUID)) == 0) {
             LOG_DBG("Found universal switch request characteristic");
             slot->universal_switch_request_handle = bt_gatt_attr_value_handle(attr);
-            slot->universal_switch_subscribe_params.disc_params = &slot->sub_discover_params;
+            slot->universal_switch_subscribe_params.disc_params =
+                &slot->universal_switch_sub_discover_params;
             slot->universal_switch_subscribe_params.end_handle = slot->discover_params.end_handle;
             slot->universal_switch_subscribe_params.value_handle =
                 slot->universal_switch_request_handle;
             slot->universal_switch_subscribe_params.notify = split_central_universal_switch_notify;
             slot->universal_switch_subscribe_params.value = BT_GATT_CCC_NOTIFY;
-            int switch_sub_err =
-                split_central_subscribe(conn, &slot->universal_switch_subscribe_params);
-            if (switch_sub_err) {
-                LOG_WRN("Could not subscribe to universal switch requests (%d)", switch_sub_err);
-            }
         } else if (bt_uuid_cmp(chrc_uuid, BT_UUID_DECLARE_128(
                                               ZMK_SPLIT_BT_CHAR_UNIVERSAL_IDENTITY_UUID)) == 0) {
             LOG_DBG("Found universal peripheral identity characteristic");
@@ -1135,18 +1205,16 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
         } else if (!bt_uuid_cmp(((struct bt_gatt_chrc *)attr->user_data)->uuid,
                                 BT_UUID_BAS_BATTERY_LEVEL)) {
             LOG_DBG("Found battery level characteristics");
-            slot->batt_lvl_subscribe_params.disc_params = &slot->sub_discover_params;
+            slot->batt_lvl_subscribe_params.disc_params = &slot->batt_lvl_sub_discover_params;
             slot->batt_lvl_subscribe_params.end_handle = slot->discover_params.end_handle;
             slot->batt_lvl_subscribe_params.value_handle = bt_gatt_attr_value_handle(attr);
             slot->batt_lvl_subscribe_params.notify = split_central_battery_level_notify_func;
             slot->batt_lvl_subscribe_params.value = BT_GATT_CCC_NOTIFY;
-            split_central_subscribe(conn, &slot->batt_lvl_subscribe_params);
 
             slot->batt_lvl_read_params.func = split_central_battery_level_read_func;
             slot->batt_lvl_read_params.handle_count = 1;
             slot->batt_lvl_read_params.single.handle = bt_gatt_attr_value_handle(attr);
             slot->batt_lvl_read_params.single.offset = 0;
-            bt_gatt_read(conn, &slot->batt_lvl_read_params);
 #endif /* IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING) */
         }
         break;
@@ -1222,7 +1290,11 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
     }
 #endif // IS_ENABLED(CONFIG_ZMK_INPUT_SPLIT)
 
-    return subscribed ? BT_GATT_ITER_STOP : BT_GATT_ITER_CONTINUE;
+    if (subscribed) {
+        split_central_flush_subscriptions(conn, slot);
+        return BT_GATT_ITER_STOP;
+    }
+    return BT_GATT_ITER_CONTINUE;
 }
 
 static uint8_t split_central_service_discovery_func(struct bt_conn *conn,
