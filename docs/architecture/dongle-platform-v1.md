@@ -176,6 +176,8 @@ The table is a target matrix, not a claim that every combination has already bee
 - Compare timing configuration and behaviour against the baseline before and after Studio integration.
 - Do not change tapping-term defaults or hold-tap decision logic as part of unrelated modularization.
 
+The inspected Hana and Chocofi keymaps both currently declare balanced Mod-Tap with a 200 ms tapping term and 175 ms quick-tap. These values are preserved in the integration branches. Experimental keymap branches that change the flavor to hold-preferred are not silently incorporated into the architecture baseline.
+
 ## 8. Baseline selection
 
 The initial shared firmware baseline is 0e82b8fb198088c9242cad7fb341e83573da65dc.
