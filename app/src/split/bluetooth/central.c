@@ -802,6 +802,10 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
     subscribed = subscribed && slot->batt_lvl_subscribe_params.value_handle;
 #endif /* IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING) */
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY)
+    /* Do not finish discovery before the physical-side battery mapping is available. */
+    subscribed = subscribed && slot->side_id_handle;
+#endif /* IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_SIDE_IDENTITY) */
 #if IS_ENABLED(CONFIG_ZMK_INPUT_SPLIT)
     for (size_t i = 0; i < ARRAY_SIZE(peripheral_input_slots); i++) {
         if (input_slot_is_open(i) || input_slot_is_pending(i)) {
