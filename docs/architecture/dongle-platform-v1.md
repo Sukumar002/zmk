@@ -76,6 +76,8 @@ Keep frontend, TypeScript client, message definitions and firmware RPC implement
 
 Studio runtime editing must not silently rewrite firmware-defined tapping terms unless a user explicitly changes a supported timing property. The first architecture release will preserve firmware timing as the authority.
 
+The selected firmware branch pins zmk-studio-messages to commit e416c02ad1a431de504270ed2477190a0ab5d5c2. The matching TypeScript client work branch uses the same submodule commit and no longer fetches the moving main branch during postinstall.
+
 ## 4. Board and MCU adapter contracts
 
 A board configuration declares only facts it owns:
