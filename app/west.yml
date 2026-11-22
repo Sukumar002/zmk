@@ -43,7 +43,7 @@ manifest:
       path: modules/lib/gui/lvgl
       remote: zmkfirmware
     - name: zmk-studio-messages
-      revision: hana-combo-names
+      revision: e416c02ad1a431de504270ed2477190a0ab5d5c2
       path: modules/msgs/zmk-studio-messages
       remote: sukumar
   group-filter: [+optional]
