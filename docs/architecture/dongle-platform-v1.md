@@ -54,6 +54,8 @@ Separate these concepts:
 
 A missing charging sensor is unsupported or unknown, not not-charging. A disconnected peripheral battery is unknown/unavailable, not zero percent. The UI must not interpret a USB-powered voltage rail as proof that a battery is installed.
 
+A source audit found that the split transport declares CHARGE_STATUS_EVENT but the BLE split service does not currently forward it to the central. Side-aware peripheral charging state is therefore an explicit implementation gap; do not claim charging indicators work until the transport and reconnect path are implemented and tested.
+
 ### 3.4 Display model and widgets
 
 Owns a hardware-neutral model of status data and reusable widgets. It consumes connection, battery, USB, layer, WPM and other events through public interfaces.
