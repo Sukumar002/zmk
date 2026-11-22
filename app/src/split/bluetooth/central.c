@@ -158,6 +158,34 @@ void peripheral_event_work_callback(struct k_work *work);
 
 K_WORK_DEFINE(peripheral_event_work, peripheral_event_work_callback);
 
+struct dongle_identity_event_wrapper {
+    struct zmk_dongle_peripheral_identity_changed event;
+};
+
+K_MSGQ_DEFINE(dongle_identity_event_msgq, sizeof(struct dongle_identity_event_wrapper),
+              CONFIG_ZMK_SPLIT_BLE_CENTRAL_POSITION_QUEUE_SIZE, 4);
+
+static void dongle_identity_event_work_callback(struct k_work *work) {
+    struct dongle_identity_event_wrapper wrapper;
+    while (k_msgq_get(&dongle_identity_event_msgq, &wrapper, K_NO_WAIT) == 0) {
+        raise_zmk_dongle_peripheral_identity_changed(wrapper.event);
+    }
+}
+
+K_WORK_DEFINE(dongle_identity_event_work, dongle_identity_event_work_callback);
+
+static void queue_dongle_identity_event(
+    struct zmk_dongle_peripheral_identity_changed event) {
+    struct dongle_identity_event_wrapper wrapper = {.event = event};
+    if (k_msgq_put(&dongle_identity_event_msgq, &wrapper, K_NO_WAIT) != 0) {
+        LOG_WRN("Dropping split peripheral identity event because its queue is full");
+        return;
+    }
+    k_work_submit(&dongle_identity_event_work);
+}
+
+
+
 int zmk_split_central_get_peripheral_side(uint8_t source,
                                           enum zmk_split_peripheral_side *side) {
     if (!side || source >= ZMK_SPLIT_BLE_PERIPHERAL_COUNT) {
@@ -211,7 +239,7 @@ int release_peripheral_slot(int index) {
         bt_conn_unref(slot->conn);
         slot->conn = NULL;
     }
-    raise_zmk_dongle_peripheral_identity_changed(
+    queue_dongle_identity_event(
         (struct zmk_dongle_peripheral_identity_changed){
             .source = index,
             .side = slot->side,
@@ -462,7 +490,7 @@ static uint8_t split_central_peripheral_side_read_func(
         slot->side_identity_valid = true;
     }
 
-    raise_zmk_dongle_peripheral_identity_changed(
+    queue_dongle_identity_event(
         (struct zmk_dongle_peripheral_identity_changed){
             .source = peripheral_slot_index_for_conn(conn),
             .side = slot->side,
