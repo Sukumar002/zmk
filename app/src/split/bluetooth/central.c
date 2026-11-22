@@ -37,6 +37,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/physical_layouts.h>
 
 static int start_scanning(void);
+static void split_central_side_read_work_cb(struct k_work *work);
 
 #define POSITION_STATE_DATA_LEN 16
 
@@ -58,6 +59,7 @@ struct peripheral_slot {
     enum zmk_split_peripheral_side side;
     bool side_identity_valid;
     struct bt_gatt_read_params side_read_params;
+    struct k_work side_read_work;
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
     struct bt_gatt_subscribe_params batt_lvl_subscribe_params;
     struct bt_gatt_read_params batt_lvl_read_params;
@@ -203,6 +205,8 @@ int release_peripheral_slot(int index) {
 
     LOG_DBG("Releasing peripheral slot at %d", index);
 
+    k_work_cancel(&slot->side_read_work);
+
     if (slot->conn != NULL) {
         bt_conn_unref(slot->conn);
         slot->conn = NULL;
@@ -261,6 +265,7 @@ int reserve_peripheral_slot(const bt_addr_le_t *addr) {
         if (peripherals[i].state == PERIPHERAL_SLOT_STATE_OPEN) {
             // Be sure the slot is fully reinitialized.
             release_peripheral_slot(i);
+            k_work_init(&peripherals[i].side_read_work, split_central_side_read_work_cb);
             peripherals[i].state = PERIPHERAL_SLOT_STATE_CONNECTING;
             return i;
         }
@@ -468,6 +473,25 @@ static uint8_t split_central_peripheral_side_read_func(
     return BT_GATT_ITER_CONTINUE;
 }
 
+static void split_central_side_read_work_cb(struct k_work *work) {
+    struct peripheral_slot *slot =
+        CONTAINER_OF(work, struct peripheral_slot, side_read_work);
+    if (slot->state != PERIPHERAL_SLOT_STATE_CONNECTED || !slot->conn ||
+        !slot->peripheral_side_handle) {
+        return;
+    }
+
+    slot->side_read_params.func = split_central_peripheral_side_read_func;
+    slot->side_read_params.handle_count = 1;
+    slot->side_read_params.single.handle = slot->peripheral_side_handle;
+    slot->side_read_params.single.offset = 0;
+
+    int err = bt_gatt_read(slot->conn, &slot->side_read_params);
+    if (err) {
+        LOG_WRN("Failed to read split peripheral side identity (%d)", err);
+    }
+}
+
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
 
 static uint8_t split_central_battery_level_notify_func(struct bt_conn *conn,
@@ -617,6 +641,10 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
                                                  struct bt_gatt_discover_params *params) {
     if (!attr) {
         LOG_DBG("Discover complete");
+        struct peripheral_slot *slot = peripheral_slot_for_conn(conn);
+        if (slot && slot->peripheral_side_handle) {
+            k_work_submit(&slot->side_read_work);
+        }
         return BT_GATT_ITER_STOP;
     }
 
@@ -640,14 +668,7 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
                         BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_PERIPHERAL_SIDE_UUID)) == 0) {
             LOG_DBG("Found peripheral physical-side characteristic");
             slot->peripheral_side_handle = bt_gatt_attr_value_handle(attr);
-            slot->side_read_params.func = split_central_peripheral_side_read_func;
-            slot->side_read_params.handle_count = 1;
-            slot->side_read_params.single.handle = slot->peripheral_side_handle;
-            slot->side_read_params.single.offset = 0;
-            int err = bt_gatt_read(conn, &slot->side_read_params);
-            if (err) {
-                LOG_WRN("Failed to request peripheral side identity (%d)", err);
-            }
+            /* The actual read is deferred until characteristic discovery completes. */
         } else if (bt_uuid_cmp(chrc_uuid, BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_POSITION_STATE_UUID)) ==
             0) {
             LOG_DBG("Found position state characteristic");
@@ -774,30 +795,9 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
         break;
     }
 
-    bool subscribed = slot->run_behavior_handle && slot->subscribe_params.value_handle &&
-                      slot->selected_physical_layout_handle;
+    return BT_GATT_ITER_CONTINUE;
+}
 
-#if ZMK_KEYMAP_HAS_SENSORS
-    subscribed = subscribed && slot->sensor_subscribe_params.value_handle;
-#endif /* ZMK_KEYMAP_HAS_SENSORS */
-
-#if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
-    subscribed = subscribed && slot->update_hid_indicators;
-#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
-#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
-    subscribed = subscribed && slot->batt_lvl_subscribe_params.value_handle;
-#endif /* IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING) */
-    subscribed = subscribed && slot->peripheral_side_handle;
-#if IS_ENABLED(CONFIG_ZMK_INPUT_SPLIT)
-    for (size_t i = 0; i < ARRAY_SIZE(peripheral_input_slots); i++) {
-        if (input_slot_is_open(i) || input_slot_is_pending(i)) {
-            subscribed = false;
-            break;
-        }
-    }
-#endif // IS_ENABLED(CONFIG_ZMK_INPUT_SPLIT)
-
-    return subscribed ? BT_GATT_ITER_STOP : BT_GATT_ITER_CONTINUE;
 }
 
 static uint8_t split_central_service_discovery_func(struct bt_conn *conn,
