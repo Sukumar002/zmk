@@ -220,3 +220,35 @@ The first architecture milestone is complete when:
 - all dependencies are immutable and documented.
 
 No stable branch, tag, release or existing firmware artifact is changed by this RFC.
+
+## 11. Implementation status — 2026-11-22
+
+### Completed on isolated branches
+
+- Common firmware base selected from the Chocofi/Hana shared history; hold-tap source and binding remain byte-identical to the selected base.
+- Studio protocol definitions pinned to commit e416c02ad1a431de504270ed2477190a0ab5d5c2 in firmware and TypeScript client.
+- Runtime behaviour editing defaults to disabled, including with Studio RPC enabled; combo runtime editing remains independently available.
+- Generic display base-view API replaces Hana-named exported functions; the legacy settings subtree is retained only for preference compatibility.
+- Explicit compact 128x32 renderer mode added; 128x64 retains the full dashboard.
+- Display module build matrix passed: no-display, 128x32 and 128x64 on XIAO nRF52840 and nice_nano-compatible targets (6/6).
+- Hana integration build matrix passed (8/8); Chocofi integration build matrix passed (7/7).
+- Hana and Chocofi integration branches use the same immutable firmware and display-module revisions. Their keymap files are unchanged from their respective main-branch baselines.
+
+### Known gaps before declaring the architecture fully portable
+
+- Peripheral charge-status events are declared in the firmware event model but are not yet forwarded through the BLE split service. Charging indicators are not qualified.
+- The display module still contains a XIAO-specific charging GPIO adapter and a nice!nano-specific battery-presence inference. These must become independently selectable hardware capability adapters.
+- The identity banner still relies on firmware-side code with fixed board labels and LVGL ownership. It must be replaced by a generic identity model/event and board-supplied labels.
+- The display test fixtures prove compile portability, not physical I2C pin mapping, OLED readability, charging detection or runtime battery accuracy.
+- The duplicated layout-shift behaviour remains an extraction candidate; its binding/Studio metadata needs a separate audit before moving it.
+
+### Next implementation order
+
+1. Complete generic identity state/event contract and move identity rendering into the display module.
+2. Separate battery state model from battery measurement/presence and charging hardware adapters.
+3. Implement side-aware BLE charge-status transport and reconnect/disconnect handling.
+4. Extract reusable behaviour implementations and verify Studio registration/binding metadata.
+5. Add runtime regression tests for identity order, battery source mapping, charging transitions, display timeout and tapping behaviour.
+6. Port Sweep and Sofle, then qualify Totem/XIAO and additional MCU targets.
+
+All successful results above are compile/build results from GitHub Actions. No hardware test, firmware flash, stable-branch merge or release has occurred.
