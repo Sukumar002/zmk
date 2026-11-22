@@ -478,13 +478,12 @@ static uint8_t split_central_peripheral_side_read_func(struct bt_conn *conn, uin
 
     if (length != sizeof(uint8_t)) {
         LOG_WRN("Ignoring invalid split peripheral side payload length %u", length);
-        queue_dongle_identity_event(
-            (struct zmk_dongle_peripheral_identity_changed){
-                .source = peripheral_slot_index_for_conn(conn),
-                .side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN,
-                .identity_valid = false,
-                .connected = true,
-            });
+        queue_dongle_identity_event((struct zmk_dongle_peripheral_identity_changed){
+            .source = peripheral_slot_index_for_conn(conn),
+            .side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN,
+            .identity_valid = false,
+            .connected = true,
+        });
         return BT_GATT_ITER_STOP;
     }
 
