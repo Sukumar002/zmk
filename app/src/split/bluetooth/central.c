@@ -426,6 +426,7 @@ static uint8_t split_central_notify_func(struct bt_conn *conn,
 static uint8_t split_central_peripheral_side_read_func(
     struct bt_conn *conn, uint8_t err, struct bt_gatt_read_params *params,
     const void *data, uint16_t length) {
+    (void)params;
     struct peripheral_slot *slot = peripheral_slot_for_conn(conn);
     if (!slot) {
         return BT_GATT_ITER_STOP;
