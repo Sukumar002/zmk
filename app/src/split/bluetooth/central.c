@@ -166,6 +166,7 @@ K_MSGQ_DEFINE(dongle_identity_event_msgq, sizeof(struct dongle_identity_event_wr
               CONFIG_ZMK_SPLIT_BLE_CENTRAL_POSITION_QUEUE_SIZE, 4);
 
 static void dongle_identity_event_work_callback(struct k_work *work) {
+    ARG_UNUSED(work);
     struct dongle_identity_event_wrapper wrapper;
     while (k_msgq_get(&dongle_identity_event_msgq, &wrapper, K_NO_WAIT) == 0) {
         raise_zmk_dongle_peripheral_identity_changed(wrapper.event);
