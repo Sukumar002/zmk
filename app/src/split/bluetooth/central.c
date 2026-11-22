@@ -468,6 +468,13 @@ static uint8_t split_central_peripheral_side_read_func(
 
     if (err > 0) {
         LOG_WRN("Unable to read split peripheral physical side (%u)", err);
+        queue_dongle_identity_event(
+            (struct zmk_dongle_peripheral_identity_changed){
+                .source = peripheral_slot_index_for_conn(conn),
+                .side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN,
+                .identity_valid = false,
+                .connected = true,
+            });
         return BT_GATT_ITER_STOP;
     }
 
@@ -477,6 +484,13 @@ static uint8_t split_central_peripheral_side_read_func(
 
     if (length != sizeof(uint8_t)) {
         LOG_WRN("Ignoring invalid split peripheral side payload length %u", length);
+        queue_dongle_identity_event(
+            (struct zmk_dongle_peripheral_identity_changed){
+                .source = peripheral_slot_index_for_conn(conn),
+                .side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN,
+                .identity_valid = false,
+                .connected = true,
+            });
         return BT_GATT_ITER_STOP;
     }
 
@@ -518,6 +532,13 @@ static void split_central_side_read_work_cb(struct k_work *work) {
     int err = bt_gatt_read(slot->conn, &slot->side_read_params);
     if (err) {
         LOG_WRN("Failed to read split peripheral side identity (%d)", err);
+        queue_dongle_identity_event(
+            (struct zmk_dongle_peripheral_identity_changed){
+                .source = peripheral_slot_index_for_conn(slot->conn),
+                .side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN,
+                .identity_valid = false,
+                .connected = true,
+            });
     }
 }
 
@@ -673,6 +694,15 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
         struct peripheral_slot *slot = peripheral_slot_for_conn(conn);
         if (slot && slot->peripheral_side_handle) {
             k_work_submit(&slot->side_read_work);
+        } else if (slot) {
+            /* Older peripheral firmware has no side characteristic. */
+            queue_dongle_identity_event(
+                (struct zmk_dongle_peripheral_identity_changed){
+                    .source = peripheral_slot_index_for_conn(conn),
+                    .side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN,
+                    .identity_valid = false,
+                    .connected = true,
+                });
         }
         return BT_GATT_ITER_STOP;
     }
