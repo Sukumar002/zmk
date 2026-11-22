@@ -857,8 +857,6 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
     return BT_GATT_ITER_CONTINUE;
 }
 
-}
-
 static uint8_t split_central_service_discovery_func(struct bt_conn *conn,
                                                     const struct bt_gatt_attr *attr,
                                                     struct bt_gatt_discover_params *params) {
