@@ -175,8 +175,7 @@ static void dongle_identity_event_work_callback(struct k_work *work) {
 
 K_WORK_DEFINE(dongle_identity_event_work, dongle_identity_event_work_callback);
 
-static void queue_dongle_identity_event(
-    struct zmk_dongle_peripheral_identity_changed event) {
+static void queue_dongle_identity_event(struct zmk_dongle_peripheral_identity_changed event) {
     struct dongle_identity_event_wrapper wrapper = {.event = event};
     if (k_msgq_put(&dongle_identity_event_msgq, &wrapper, K_NO_WAIT) != 0) {
         LOG_WRN("Dropping split peripheral identity event because its queue is full");
@@ -185,10 +184,7 @@ static void queue_dongle_identity_event(
     k_work_submit(&dongle_identity_event_work);
 }
 
-
-
-int zmk_split_central_get_peripheral_side(uint8_t source,
-                                          enum zmk_split_peripheral_side *side) {
+int zmk_split_central_get_peripheral_side(uint8_t source, enum zmk_split_peripheral_side *side) {
     if (!side || source >= ZMK_SPLIT_BLE_PERIPHERAL_COUNT) {
         return -EINVAL;
     }
@@ -240,13 +236,12 @@ int release_peripheral_slot(int index) {
         bt_conn_unref(slot->conn);
         slot->conn = NULL;
     }
-    queue_dongle_identity_event(
-        (struct zmk_dongle_peripheral_identity_changed){
-            .source = index,
-            .side = slot->side,
-            .identity_valid = slot->side_identity_valid,
-            .connected = false,
-        });
+    queue_dongle_identity_event((struct zmk_dongle_peripheral_identity_changed){
+        .source = index,
+        .side = slot->side,
+        .identity_valid = slot->side_identity_valid,
+        .connected = false,
+    });
 
     slot->state = PERIPHERAL_SLOT_STATE_OPEN;
 
@@ -457,9 +452,9 @@ static uint8_t split_central_notify_func(struct bt_conn *conn,
     return BT_GATT_ITER_CONTINUE;
 }
 
-static uint8_t split_central_peripheral_side_read_func(
-    struct bt_conn *conn, uint8_t err, struct bt_gatt_read_params *params,
-    const void *data, uint16_t length) {
+static uint8_t split_central_peripheral_side_read_func(struct bt_conn *conn, uint8_t err,
+                                                       struct bt_gatt_read_params *params,
+                                                       const void *data, uint16_t length) {
     (void)params;
     struct peripheral_slot *slot = peripheral_slot_for_conn(conn);
     if (!slot) {
@@ -468,13 +463,12 @@ static uint8_t split_central_peripheral_side_read_func(
 
     if (err > 0) {
         LOG_WRN("Unable to read split peripheral physical side (%u)", err);
-        queue_dongle_identity_event(
-            (struct zmk_dongle_peripheral_identity_changed){
-                .source = peripheral_slot_index_for_conn(conn),
-                .side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN,
-                .identity_valid = false,
-                .connected = true,
-            });
+        queue_dongle_identity_event((struct zmk_dongle_peripheral_identity_changed){
+            .source = peripheral_slot_index_for_conn(conn),
+            .side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN,
+            .identity_valid = false,
+            .connected = true,
+        });
         return BT_GATT_ITER_STOP;
     }
 
@@ -495,8 +489,7 @@ static uint8_t split_central_peripheral_side_read_func(
     }
 
     uint8_t value = ((const uint8_t *)data)[0];
-    if (value != ZMK_SPLIT_PERIPHERAL_SIDE_LEFT &&
-        value != ZMK_SPLIT_PERIPHERAL_SIDE_RIGHT) {
+    if (value != ZMK_SPLIT_PERIPHERAL_SIDE_LEFT && value != ZMK_SPLIT_PERIPHERAL_SIDE_RIGHT) {
         slot->side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN;
         slot->side_identity_valid = false;
         LOG_WRN("Split peripheral reported unknown physical side %u", value);
@@ -505,20 +498,18 @@ static uint8_t split_central_peripheral_side_read_func(
         slot->side_identity_valid = true;
     }
 
-    queue_dongle_identity_event(
-        (struct zmk_dongle_peripheral_identity_changed){
-            .source = peripheral_slot_index_for_conn(conn),
-            .side = slot->side,
-            .identity_valid = slot->side_identity_valid,
-            .connected = true,
-        });
+    queue_dongle_identity_event((struct zmk_dongle_peripheral_identity_changed){
+        .source = peripheral_slot_index_for_conn(conn),
+        .side = slot->side,
+        .identity_valid = slot->side_identity_valid,
+        .connected = true,
+    });
 
     return BT_GATT_ITER_CONTINUE;
 }
 
 static void split_central_side_read_work_cb(struct k_work *work) {
-    struct peripheral_slot *slot =
-        CONTAINER_OF(work, struct peripheral_slot, side_read_work);
+    struct peripheral_slot *slot = CONTAINER_OF(work, struct peripheral_slot, side_read_work);
     if (slot->state != PERIPHERAL_SLOT_STATE_CONNECTED || !slot->conn ||
         !slot->peripheral_side_handle) {
         return;
@@ -532,13 +523,12 @@ static void split_central_side_read_work_cb(struct k_work *work) {
     int err = bt_gatt_read(slot->conn, &slot->side_read_params);
     if (err) {
         LOG_WRN("Failed to read split peripheral side identity (%d)", err);
-        queue_dongle_identity_event(
-            (struct zmk_dongle_peripheral_identity_changed){
-                .source = peripheral_slot_index_for_conn(slot->conn),
-                .side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN,
-                .identity_valid = false,
-                .connected = true,
-            });
+        queue_dongle_identity_event((struct zmk_dongle_peripheral_identity_changed){
+            .source = peripheral_slot_index_for_conn(slot->conn),
+            .side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN,
+            .identity_valid = false,
+            .connected = true,
+        });
     }
 }
 
@@ -696,13 +686,12 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
             k_work_submit(&slot->side_read_work);
         } else if (slot) {
             /* Older peripheral firmware has no side characteristic. */
-            queue_dongle_identity_event(
-                (struct zmk_dongle_peripheral_identity_changed){
-                    .source = peripheral_slot_index_for_conn(conn),
-                    .side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN,
-                    .identity_valid = false,
-                    .connected = true,
-                });
+            queue_dongle_identity_event((struct zmk_dongle_peripheral_identity_changed){
+                .source = peripheral_slot_index_for_conn(conn),
+                .side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN,
+                .identity_valid = false,
+                .connected = true,
+            });
         }
         return BT_GATT_ITER_STOP;
     }
@@ -723,13 +712,13 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
     case BT_GATT_DISCOVER_CHARACTERISTIC: {
         const struct bt_uuid *chrc_uuid = ((struct bt_gatt_chrc *)attr->user_data)->uuid;
 
-        if (bt_uuid_cmp(chrc_uuid,
-                        BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_PERIPHERAL_SIDE_UUID)) == 0) {
+        if (bt_uuid_cmp(chrc_uuid, BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_PERIPHERAL_SIDE_UUID)) ==
+            0) {
             LOG_DBG("Found peripheral physical-side characteristic");
             slot->peripheral_side_handle = bt_gatt_attr_value_handle(attr);
             /* The actual read is deferred until characteristic discovery completes. */
-        } else if (bt_uuid_cmp(chrc_uuid, BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_POSITION_STATE_UUID)) ==
-            0) {
+        } else if (bt_uuid_cmp(chrc_uuid,
+                               BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_POSITION_STATE_UUID)) == 0) {
             LOG_DBG("Found position state characteristic");
             slot->subscribe_params.disc_params = &slot->sub_discover_params;
             slot->subscribe_params.end_handle = slot->discover_params.end_handle;
