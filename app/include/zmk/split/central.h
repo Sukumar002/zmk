@@ -32,6 +32,16 @@
 #include <zmk/hid_indicators_types.h>
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
 
+enum zmk_split_peripheral_side {
+    ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN = 0,
+    ZMK_SPLIT_PERIPHERAL_SIDE_LEFT = 1,
+    ZMK_SPLIT_PERIPHERAL_SIDE_RIGHT = 2,
+};
+
+/* Returns -EAGAIN until the peripheral's explicit physical identity is read. */
+int zmk_split_central_get_peripheral_side(uint8_t source,
+                                          enum zmk_split_peripheral_side *side);
+
 int zmk_split_central_invoke_behavior(uint8_t source, struct zmk_behavior_binding *binding,
                                       struct zmk_behavior_binding_event event, bool state);
 
