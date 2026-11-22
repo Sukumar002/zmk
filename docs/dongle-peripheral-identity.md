@@ -9,11 +9,11 @@ This contract is the transport-level source of physical LEFT/RIGHT identity for 
 - Properties: encrypted read
 - Payload: exactly one byte
 
-| Value | Meaning |
-|---:|---|
-| 0 | Unknown / not configured |
-| 1 | Physical LEFT half |
-| 2 | Physical RIGHT half |
+| Value | Meaning                  |
+| ----: | ------------------------ |
+|     0 | Unknown / not configured |
+|     1 | Physical LEFT half       |
+|     2 | Physical RIGHT half      |
 
 A peripheral reports the value configured by `CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_SIDE`. Dongle-side peripheral builds must explicitly set 1 or 2. The default is 0 so unconfigured firmware cannot silently claim a side.
 
@@ -27,6 +27,7 @@ A peripheral reports the value configured by `CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_SI
 ## Consumer requirements
 
 The dongle core must:
+
 1. Maintain state by physical side, not by source index.
 2. Reject or quarantine duplicate simultaneous LEFT or RIGHT claims.
 3. Keep an unknown-side peripheral out of the LEFT/RIGHT battery display slots.
