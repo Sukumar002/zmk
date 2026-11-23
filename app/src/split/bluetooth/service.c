@@ -34,11 +34,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #include <zmk/events/sensor_event.h>
 #include <zmk/sensors.h>
-#include <zmk/event_manager.h>
-#include <zmk/events/battery_state_changed.h>
-#include <zmk/events/usb_conn_state_changed.h>
-#include <zmk/battery.h>
-#include <zmk/usb.h>
+#if DT_HAS_CHOSEN(zmk_charge_status)
+#include <zephyr/drivers/gpio.h>
+#endif
 
 #if ZMK_KEYMAP_HAS_SENSORS
 static struct sensor_event last_sensor_event;
@@ -61,33 +59,72 @@ static uint8_t position_state[POS_STATE_LEN];
 static uint8_t peripheral_side = CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_SIDE;
 
 /*
- * Charge state is intentionally conservative: report charging only when USB
- * power is present and a battery reading is available between 1% and 99%.
- * Boards without USB/battery reporting simply expose "not charging".
+ * Charging is reported only when a board explicitly supplies a charge-status
+ * GPIO through the zmk_charge_status chosen node. No VBUS/battery-level
+ * inference is used: boards without a real charger signal report false.
  */
 static uint8_t peripheral_charging;
-
-static uint8_t split_svc_get_charge_status(void) {
-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK) && IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)
-    const uint8_t level = zmk_battery_state_of_charge();
-    return zmk_usb_is_powered() && level > 0 && level < 100;
-#else
-    return 0;
-#endif
-}
-
 static void split_svc_update_charge_status(void);
 
-static int split_svc_charge_status_listener(const zmk_event_t *eh) {
-    if (as_zmk_usb_conn_state_changed(eh) || as_zmk_battery_state_changed(eh)) {
-        split_svc_update_charge_status();
+#if DT_HAS_CHOSEN(zmk_charge_status)
+static const struct gpio_dt_spec charge_status_gpio =
+    GPIO_DT_SPEC_GET(DT_CHOSEN(zmk_charge_status), gpios);
+static struct gpio_callback charge_status_gpio_cb;
+static struct k_work charge_status_notify_work;
+static bool charge_status_gpio_ready;
+
+static uint8_t split_svc_get_charge_status(void) {
+    if (!charge_status_gpio_ready) {
+        return 0;
     }
-    return ZMK_EV_EVENT_BUBBLE;
+    return gpio_pin_get_dt(&charge_status_gpio) > 0;
 }
 
-ZMK_LISTENER(split_svc_charge_status, split_svc_charge_status_listener);
-ZMK_SUBSCRIPTION(split_svc_charge_status, zmk_usb_conn_state_changed);
-ZMK_SUBSCRIPTION(split_svc_charge_status, zmk_battery_state_changed);
+static void split_svc_charge_status_work_cb(struct k_work *work) {
+    split_svc_update_charge_status();
+}
+
+static void split_svc_charge_status_gpio_cb(const struct device *port,
+                                            struct gpio_callback *cb, uint32_t pins) {
+    k_work_submit(&charge_status_notify_work);
+}
+
+static int split_svc_charge_status_gpio_init(void) {
+    if (!gpio_is_ready_dt(&charge_status_gpio)) {
+        LOG_WRN("Charge status GPIO is not ready; charging indication disabled");
+        return 0;
+    }
+
+    int err = gpio_pin_configure_dt(&charge_status_gpio, GPIO_INPUT);
+    if (err) {
+        LOG_WRN("Unable to configure charge status GPIO (%d)", err);
+        return 0;
+    }
+
+    gpio_init_callback(&charge_status_gpio_cb, split_svc_charge_status_gpio_cb,
+                       BIT(charge_status_gpio.pin));
+    err = gpio_add_callback(charge_status_gpio.port, &charge_status_gpio_cb);
+    if (err) {
+        LOG_WRN("Unable to register charge status GPIO callback (%d)", err);
+        return 0;
+    }
+
+    err = gpio_pin_interrupt_configure_dt(&charge_status_gpio, GPIO_INT_EDGE_BOTH);
+    if (err) {
+        LOG_WRN("Unable to enable charge status GPIO interrupts (%d)", err);
+        return 0;
+    }
+
+    charge_status_gpio_ready = true;
+    peripheral_charging = split_svc_get_charge_status();
+    return 0;
+}
+
+K_WORK_DEFINE(charge_status_notify_work, split_svc_charge_status_work_cb);
+SYS_INIT(split_svc_charge_status_gpio_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+#else
+static uint8_t split_svc_get_charge_status(void) { return 0; }
+#endif
 
 static ssize_t split_svc_peripheral_side(struct bt_conn *conn, const struct bt_gatt_attr *attrs,
                                          void *buf, uint16_t len, uint16_t offset) {
