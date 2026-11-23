@@ -62,7 +62,6 @@ struct peripheral_slot {
     struct k_work side_read_work;
     uint16_t charge_status_handle;
     struct bt_gatt_subscribe_params charge_status_subscribe_params;
-    struct bt_gatt_read_params charge_status_read_params;
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
     struct bt_gatt_subscribe_params batt_lvl_subscribe_params;
     struct bt_gatt_read_params batt_lvl_read_params;
@@ -698,23 +697,6 @@ static uint8_t split_central_charge_status_notify_func(struct bt_conn *conn,
     return BT_GATT_ITER_CONTINUE;
 }
 
-static uint8_t split_central_charge_status_read_func(struct bt_conn *conn, uint8_t err,
-                                                     struct bt_gatt_read_params *params,
-                                                     const void *data, uint16_t length) {
-    (void)params;
-    if (err || !data || length != sizeof(uint8_t)) {
-        LOG_DBG("Peripheral charge status read unavailable (%u)", err);
-        return BT_GATT_ITER_STOP;
-    }
-    struct peripheral_event_wrapper ev = {
-        .source = peripheral_slot_index_for_conn(conn),
-        .event = {.type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_CHARGE_STATUS_EVENT,
-                  .data = {.charge_status_event = {.charging = !!((const uint8_t *)data)[0]}}}};
-    k_msgq_put(&peripheral_event_msgq, &ev, K_NO_WAIT);
-    k_work_submit(&peripheral_event_work);
-    return BT_GATT_ITER_CONTINUE;
-}
-
 static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
                                                  const struct bt_gatt_attr *attr,
                                                  struct bt_gatt_discover_params *params) {
@@ -767,11 +749,6 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
             slot->charge_status_subscribe_params.value = BT_GATT_CCC_NOTIFY;
             split_central_subscribe(conn, &slot->charge_status_subscribe_params);
 
-            slot->charge_status_read_params.func = split_central_charge_status_read_func;
-            slot->charge_status_read_params.handle_count = 1;
-            slot->charge_status_read_params.single.handle = slot->charge_status_handle;
-            slot->charge_status_read_params.single.offset = 0;
-            bt_gatt_read(conn, &slot->charge_status_read_params);
         } else if (bt_uuid_cmp(chrc_uuid,
                                BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_POSITION_STATE_UUID)) == 0) {
             LOG_DBG("Found position state characteristic");
