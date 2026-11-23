@@ -199,6 +199,12 @@ static int send_response(const zmk_studio_Response *resp) {
 #if !IS_ENABLED(CONFIG_NANOPB_NO_ERRMSG)
         LOG_ERR("Failed to encode the message %s", stream.errmsg);
 #endif // !IS_ENABLED(CONFIG_NANOPB_NO_ERRMSG)
+        /*
+         * Always release rpc_transport_mutex on an encoding failure.
+         * Otherwise endpoint changes and subsequent Studio notifications
+         * can block forever while trying to acquire the transport mutex.
+         */
+        k_mutex_unlock(&rpc_transport_mutex);
         return -EINVAL;
     }
 
