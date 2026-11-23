@@ -57,14 +57,15 @@ struct behavior_input_two_axis_config {
     uint8_t acceleration_exponent;
 };
 
-
 #if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
 
 static const struct behavior_parameter_value_metadata mouse_move_param_values[] = {
     {.display_name = "Move Up", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = MOVE_UP},
     {.display_name = "Move Down", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = MOVE_DOWN},
     {.display_name = "Move Left", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = MOVE_LEFT},
-    {.display_name = "Move Right", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = MOVE_RIGHT},
+    {.display_name = "Move Right",
+     .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+     .value = MOVE_RIGHT},
 };
 
 static const struct behavior_parameter_metadata_set mouse_move_param_metadata_set[] = {{
@@ -79,9 +80,15 @@ static const struct behavior_parameter_metadata mouse_move_metadata = {
 
 static const struct behavior_parameter_value_metadata mouse_scroll_param_values[] = {
     {.display_name = "Scroll Up", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = SCRL_UP},
-    {.display_name = "Scroll Down", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = SCRL_DOWN},
-    {.display_name = "Scroll Left", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = SCRL_LEFT},
-    {.display_name = "Scroll Right", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = SCRL_RIGHT},
+    {.display_name = "Scroll Down",
+     .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+     .value = SCRL_DOWN},
+    {.display_name = "Scroll Left",
+     .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+     .value = SCRL_LEFT},
+    {.display_name = "Scroll Right",
+     .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+     .value = SCRL_RIGHT},
 };
 
 static const struct behavior_parameter_metadata_set mouse_scroll_param_metadata_set[] = {{
@@ -94,8 +101,9 @@ static const struct behavior_parameter_metadata mouse_scroll_metadata = {
     .sets = mouse_scroll_param_metadata_set,
 };
 
-static int behavior_input_two_axis_get_parameter_metadata(
-    const struct device *dev, struct behavior_parameter_metadata *param_metadata) {
+static int
+behavior_input_two_axis_get_parameter_metadata(const struct device *dev,
+                                               struct behavior_parameter_metadata *param_metadata) {
     const struct behavior_input_two_axis_config *cfg = dev->config;
 
     if (cfg->x_code == INPUT_REL_X && cfg->y_code == INPUT_REL_Y) {
@@ -194,8 +202,8 @@ static void track_remainder(float *move, float *remainder) {
     *move = (int)new_move;
 }
 
-static float runtime_max_speed(const struct behavior_input_two_axis_config *config,
-                               uint16_t code, int16_t requested_speed) {
+static float runtime_max_speed(const struct behavior_input_two_axis_config *config, uint16_t code,
+                               int16_t requested_speed) {
     if (requested_speed == 0) {
         return 0;
     }
@@ -223,10 +231,9 @@ static float update_movement_1d(const struct behavior_input_two_axis_config *con
     int64_t move_duration = ticks_since_start(state->start_time, now, config->delay_ms);
     float max_speed = runtime_max_speed(config, code, state->speed);
     LOG_DBG("Calculated speed: %f", (double)speed(config, code, max_speed, move_duration));
-    move =
-        (move_duration > 0)
-            ? (speed(config, code, max_speed, move_duration) * config->trigger_period_ms / 1000)
-            : 0;
+    move = (move_duration > 0)
+               ? (speed(config, code, max_speed, move_duration) * config->trigger_period_ms / 1000)
+               : 0;
 
     track_remainder(&(move), &(state->remainder));
 

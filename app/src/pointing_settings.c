@@ -21,8 +21,7 @@ uint16_t zmk_pointing_settings_scroll_speed(void) { return current.scroll_speed;
 uint8_t zmk_pointing_settings_acceleration(void) { return current.acceleration; }
 
 static bool valid(uint16_t move_speed, uint16_t scroll_speed, uint8_t acceleration) {
-    return move_speed >= 100 && move_speed <= 2000 &&
-           scroll_speed >= 1 && scroll_speed <= 50 &&
+    return move_speed >= 100 && move_speed <= 2000 && scroll_speed >= 1 && scroll_speed <= 50 &&
            acceleration <= 3;
 }
 
@@ -49,8 +48,8 @@ int zmk_pointing_settings_reset(void) {
     return settings_delete("pointing/config");
 }
 
-static int pointing_settings_set_handler(const char *name, size_t len,
-                                         settings_read_cb read_cb, void *cb_arg) {
+static int pointing_settings_set_handler(const char *name, size_t len, settings_read_cb read_cb,
+                                         void *cb_arg) {
     if (strcmp(name, "config") != 0 || len > sizeof(current)) {
         return -ENOENT;
     }
@@ -68,4 +67,5 @@ static int pointing_settings_set_handler(const char *name, size_t len,
     return 0;
 }
 
-SETTINGS_STATIC_HANDLER_DEFINE(pointing, "pointing", NULL, pointing_settings_set_handler, NULL, NULL);
+SETTINGS_STATIC_HANDLER_DEFINE(pointing, "pointing", NULL, pointing_settings_set_handler, NULL,
+                               NULL);

@@ -673,7 +673,9 @@ size_t zmk_combos_get_count(void) { return COMBO_POOL_SIZE; }
 
 size_t zmk_combos_get_capacity(void) { return COMBO_POOL_SIZE; }
 
-size_t zmk_combos_get_max_keys(void) { return MIN((size_t)MAX_COMBO_KEYS, (size_t)ZMK_COMBO_MAX_KEYS); }
+size_t zmk_combos_get_max_keys(void) {
+    return MIN((size_t)MAX_COMBO_KEYS, (size_t)ZMK_COMBO_MAX_KEYS);
+}
 
 int zmk_combos_get(uint16_t idx, struct zmk_combo *out) {
     if (idx >= COMBO_POOL_SIZE) {
@@ -859,8 +861,8 @@ int zmk_combos_save_changes(void) {
             // Preserve the compact legacy record when unnamed. Named records include
             // the appended name field; placing it after key_positions keeps old NVS
             // records readable without migration.
-            size_t len = offsetof(struct zmk_combo_setting, key_positions) +
-                         kp_count * sizeof(int16_t);
+            size_t len =
+                offsetof(struct zmk_combo_setting, key_positions) + kp_count * sizeof(int16_t);
             if (rec.display_order != 0) {
                 len = offsetof(struct zmk_combo_setting, display_order) + sizeof(rec.display_order);
             } else if (rec.name[0] != '\0') {

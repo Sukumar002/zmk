@@ -9,6 +9,7 @@
 LOG_MODULE_DECLARE(zmk_studio, CONFIG_ZMK_STUDIO_LOG_LEVEL);
 
 #include <errno.h>
+#include <string.h>
 
 #include <drivers/behavior.h>
 
@@ -22,6 +23,17 @@ ZMK_RPC_SUBSYSTEM(combos)
 
 #define COMBOS_RESPONSE(type, ...) ZMK_RPC_RESPONSE(combos, type, __VA_ARGS__)
 #define COMBOS_NOTIFICATION(type, ...) ZMK_RPC_NOTIFICATION(combos, type, __VA_ARGS__)
+
+static bool is_protected_combo(uint16_t index) {
+    struct zmk_combo combo;
+    if (zmk_combos_get(index, &combo) < 0 || !combo.behavior.behavior_dev) {
+        return false;
+    }
+
+    const char *name = combo.behavior.behavior_dev;
+    return strcmp(name, "studio_unlock") == 0 || strcmp(name, "bootloader") == 0 ||
+           strcmp(name, "keyboard_switch") == 0 || strcmp(name, "kb_switch") == 0;
+}
 
 // Encodes the repeated ComboEntry list, mirroring encode_keymap_layers.
 // key_positions is now a nanopb static array (see combos.options.in), so it is
@@ -138,6 +150,11 @@ zmk_studio_Response set_combo(const zmk_studio_Request *req) {
     LOG_DBG("");
     const zmk_combos_SetComboRequest *set_req = &req->subsystem.combos.request_type.set_combo;
 
+    if (is_protected_combo(set_req->index)) {
+        return COMBOS_RESPONSE(set_combo,
+                               zmk_combos_SetComboResponse_SET_COMBO_RESP_INVALID_BEHAVIOR);
+    }
+
     if (!set_req->has_combo) {
         return COMBOS_RESPONSE(set_combo,
                                zmk_combos_SetComboResponse_SET_COMBO_RESP_INVALID_LOCATION);
@@ -191,9 +208,8 @@ zmk_studio_Response add_combo(const zmk_studio_Request *req) {
     int ret = zmk_combos_add(&combo);
     if (ret < 0) {
         LOG_WRN("Adding combo failed with %d", ret);
-        resp.result.err = (ret == -ENOSPC)
-                              ? zmk_combos_AddComboErrorCode_ADD_COMBO_ERR_NO_SPACE
-                              : zmk_combos_AddComboErrorCode_ADD_COMBO_ERR_GENERIC;
+        resp.result.err = (ret == -ENOSPC) ? zmk_combos_AddComboErrorCode_ADD_COMBO_ERR_NO_SPACE
+                                           : zmk_combos_AddComboErrorCode_ADD_COMBO_ERR_GENERIC;
         return COMBOS_RESPONSE(add_combo, resp);
     }
 
@@ -215,6 +231,12 @@ zmk_studio_Response remove_combo(const zmk_studio_Request *req) {
     const zmk_combos_RemoveComboRequest *rm_req = &req->subsystem.combos.request_type.remove_combo;
 
     zmk_combos_RemoveComboResponse resp = zmk_combos_RemoveComboResponse_init_zero;
+
+    if (is_protected_combo(rm_req->index)) {
+        resp.which_result = zmk_combos_RemoveComboResponse_err_tag;
+        resp.result.err = zmk_combos_RemoveComboErrorCode_REMOVE_COMBO_ERR_INVALID_INDEX;
+        return COMBOS_RESPONSE(remove_combo, resp);
+    }
 
     int ret = zmk_combos_remove(rm_req->index);
     if (ret < 0) {
