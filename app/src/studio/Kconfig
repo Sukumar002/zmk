@@ -103,6 +103,7 @@ config ZMK_STUDIO_RPC_THREAD_STACK_SIZE
 
 config ZMK_STUDIO_RPC_RX_BUF_SIZE
     int "RX Buffer Size"
+    default 256 if ZMK_COMBO_RUNTIME_EDITING
     default 30
 
 config ZMK_STUDIO_RPC_TX_BUF_SIZE

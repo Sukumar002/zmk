@@ -451,6 +451,27 @@ config ZMK_COMBO_MAX_PRESSED_COMBOS
     int "Maximum number of currently pressed combos"
     default 4
 
+config ZMK_COMBO_RUNTIME_EDITING
+    bool "Runtime combo editing (ZMK Studio)"
+    default y if ZMK_STUDIO_RPC
+    select SETTINGS
+    select ZMK_BEHAVIOR_LOCAL_IDS
+    select ZMK_KEYMAP_SETTINGS_STORAGE
+    help
+      Allow combos to be created, edited, deleted and persisted through ZMK Studio.
+
+if ZMK_COMBO_RUNTIME_EDITING
+
+config ZMK_COMBO_MAX_COMBOS
+    int "Runtime combo pool size"
+    default 64
+
+config ZMK_COMBO_MAX_KEYS_PER_COMBO_RUNTIME
+    int "Maximum key positions per runtime combo"
+    default 4
+
+endif # ZMK_COMBO_RUNTIME_EDITING
+
 config ZMK_COMBO_MAX_COMBOS_PER_KEY
     int "Deprecated: Max combos per key"
     default 0
