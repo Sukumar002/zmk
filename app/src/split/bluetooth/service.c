@@ -108,6 +108,9 @@ static ssize_t split_svc_charge_status(struct bt_conn *conn,
 
 static void split_svc_charge_status_ccc(const struct bt_gatt_attr *attr, uint16_t value) {
     LOG_DBG("charge status CCC value %d", value);
+    if (value & BT_GATT_CCC_NOTIFY) {
+        split_svc_update_charge_status();
+    }
 }
 
 static struct zmk_split_run_behavior_payload behavior_run_payload;
@@ -273,12 +276,7 @@ BT_GATT_SERVICE_DEFINE(
                 BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT), );
 
 static void split_svc_update_charge_status(void) {
-    const uint8_t next = split_svc_get_charge_status();
-    if (next == peripheral_charging) {
-        return;
-    }
-
-    peripheral_charging = next;
+    peripheral_charging = split_svc_get_charge_status();
     for (size_t i = 0; i < split_svc.attr_count; i++) {
         if (bt_uuid_cmp(split_svc.attrs[i].uuid,
                         BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_CHARGE_STATUS_UUID)) == 0) {
