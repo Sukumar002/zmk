@@ -76,25 +76,7 @@ static uint8_t split_svc_get_charge_status(void) {
 #endif
 }
 
-static void split_svc_update_charge_status(void) {
-    const uint8_t next = split_svc_get_charge_status();
-    if (next == peripheral_charging) {
-        return;
-    }
-
-    peripheral_charging = next;
-    for (size_t i = 0; i < split_svc.attr_count; i++) {
-        if (bt_uuid_cmp(split_svc.attrs[i].uuid,
-                        BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_CHARGE_STATUS_UUID)) == 0) {
-            int err = bt_gatt_notify(NULL, &split_svc.attrs[i], &peripheral_charging,
-                                     sizeof(peripheral_charging));
-            if (err && err != -ENOTCONN) {
-                LOG_DBG("Unable to notify peripheral charge status (%d)", err);
-            }
-            break;
-        }
-    }
-}
+static void split_svc_update_charge_status(void);
 
 static int split_svc_charge_status_listener(const zmk_event_t *eh) {
     if (as_zmk_usb_conn_state_changed(eh) || as_zmk_battery_state_changed(eh)) {
@@ -289,6 +271,26 @@ BT_GATT_SERVICE_DEFINE(
                            split_svc_charge_status, NULL, &peripheral_charging),
     BT_GATT_CCC(split_svc_charge_status_ccc,
                 BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT), );
+
+static void split_svc_update_charge_status(void) {
+    const uint8_t next = split_svc_get_charge_status();
+    if (next == peripheral_charging) {
+        return;
+    }
+
+    peripheral_charging = next;
+    for (size_t i = 0; i < split_svc.attr_count; i++) {
+        if (bt_uuid_cmp(split_svc.attrs[i].uuid,
+                        BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_CHARGE_STATUS_UUID)) == 0) {
+            int err = bt_gatt_notify(NULL, &split_svc.attrs[i], &peripheral_charging,
+                                     sizeof(peripheral_charging));
+            if (err && err != -ENOTCONN) {
+                LOG_DBG("Unable to notify peripheral charge status (%d)", err);
+            }
+            break;
+        }
+    }
+}
 
 K_THREAD_STACK_DEFINE(service_q_stack, CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_STACK_SIZE);
 
