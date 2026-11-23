@@ -364,7 +364,9 @@ zmk_studio_Response move_layer(const zmk_studio_Request *req) {
 
     zmk_keymap_MoveLayerResponse resp = zmk_keymap_MoveLayerResponse_init_zero;
 
-    int ret = zmk_keymap_move_layer(move_req->start_index, move_req->dest_index);
+    int ret = (move_req->start_index == 0 || move_req->dest_index == 0)
+                  ? -EINVAL
+                  : zmk_keymap_move_layer(move_req->start_index, move_req->dest_index);
 
     if (ret >= 0) {
         resp.which_result = zmk_keymap_SetActivePhysicalLayoutResponse_ok_tag;
@@ -431,7 +433,7 @@ zmk_studio_Response remove_layer(const zmk_studio_Request *req) {
 
     zmk_keymap_RemoveLayerResponse resp = zmk_keymap_RemoveLayerResponse_init_zero;
 
-    int ret = zmk_keymap_remove_layer(rm_req->layer_index);
+    int ret = (rm_req->layer_index == 0) ? -EINVAL : zmk_keymap_remove_layer(rm_req->layer_index);
 
     if (ret >= 0) {
         resp.which_result = zmk_keymap_RemoveLayerResponse_ok_tag;

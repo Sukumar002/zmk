@@ -10,6 +10,12 @@
 #include <zmk/sensors.h>
 #include <zephyr/sys/util.h>
 
+enum zmk_split_peripheral_side {
+    ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN = 0,
+    ZMK_SPLIT_PERIPHERAL_SIDE_LEFT = 1,
+    ZMK_SPLIT_PERIPHERAL_SIDE_RIGHT = 2,
+};
+
 enum zmk_split_transport_connections_status {
     ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_DISCONNECTED = 0,
     ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_SOME_CONNECTED,

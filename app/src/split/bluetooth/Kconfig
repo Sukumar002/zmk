@@ -78,6 +78,15 @@ endif # ZMK_SPLIT_ROLE_CENTRAL
 
 if !ZMK_SPLIT_ROLE_CENTRAL
 
+config ZMK_SPLIT_BLE_PERIPHERAL_SIDE
+    int "Physical side identity reported by this split peripheral"
+    range 0 2
+    default 0
+    help
+      0 = unknown/unconfigured, 1 = left, 2 = right.
+      Dongle firmware must set this explicitly for every split peripheral.
+      The central never infers physical side from BLE connection order.
+
 config ZMK_SPLIT_BLE_PERIPHERAL_STACK_SIZE
     int "BLE split peripheral notify thread stack size"
     default 756

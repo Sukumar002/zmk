@@ -53,6 +53,16 @@ static void split_svc_sensor_state_ccc(const struct bt_gatt_attr *attr, uint16_t
 
 static uint8_t num_of_positions = ZMK_KEYMAP_LEN;
 static uint8_t position_state[POS_STATE_LEN];
+static uint8_t peripheral_side = CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_SIDE;
+
+static ssize_t split_svc_peripheral_side(struct bt_conn *conn, const struct bt_gatt_attr *attrs,
+                                         void *buf, uint16_t len, uint16_t offset) {
+    if (peripheral_side > 2) {
+        return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+    }
+    return bt_gatt_attr_read(conn, attrs, buf, len, offset, &peripheral_side,
+                             sizeof(peripheral_side));
+}
 
 static struct zmk_split_run_behavior_payload behavior_run_payload;
 
@@ -204,8 +214,11 @@ BT_GATT_SERVICE_DEFINE(
     BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_SELECT_PHYS_LAYOUT_UUID),
                            BT_GATT_CHRC_WRITE | BT_GATT_CHRC_READ,
                            BT_GATT_PERM_WRITE_ENCRYPT | BT_GATT_PERM_READ_ENCRYPT,
-                           split_svc_get_selected_phys_layout, split_svc_select_phys_layout,
-                           NULL), );
+                           split_svc_get_selected_phys_layout, split_svc_select_phys_layout, NULL),
+    /* Append this characteristic to preserve all legacy split attribute handles. */
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_PERIPHERAL_SIDE_UUID),
+                           BT_GATT_CHRC_READ, BT_GATT_PERM_READ_ENCRYPT, split_svc_peripheral_side,
+                           NULL, &peripheral_side), );
 
 K_THREAD_STACK_DEFINE(service_q_stack, CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_STACK_SIZE);
 

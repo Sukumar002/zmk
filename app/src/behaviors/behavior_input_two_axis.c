@@ -13,6 +13,7 @@
 #include <zephyr/sys/util.h> // CLAMP
 
 #include <zmk/behavior.h>
+#include <zmk/pointing_settings.h>
 #include <dt-bindings/zmk/pointing.h>
 
 #if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
@@ -55,6 +56,70 @@ struct behavior_input_two_axis_config {
     // acceleration exponent 2: uniform jerk
     uint8_t acceleration_exponent;
 };
+
+#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+
+static const struct behavior_parameter_value_metadata mouse_move_param_values[] = {
+    {.display_name = "Move Up", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = MOVE_UP},
+    {.display_name = "Move Down", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = MOVE_DOWN},
+    {.display_name = "Move Left", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = MOVE_LEFT},
+    {.display_name = "Move Right",
+     .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+     .value = MOVE_RIGHT},
+};
+
+static const struct behavior_parameter_metadata_set mouse_move_param_metadata_set[] = {{
+    .param1_values = mouse_move_param_values,
+    .param1_values_len = ARRAY_SIZE(mouse_move_param_values),
+}};
+
+static const struct behavior_parameter_metadata mouse_move_metadata = {
+    .sets_len = ARRAY_SIZE(mouse_move_param_metadata_set),
+    .sets = mouse_move_param_metadata_set,
+};
+
+static const struct behavior_parameter_value_metadata mouse_scroll_param_values[] = {
+    {.display_name = "Scroll Up", .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE, .value = SCRL_UP},
+    {.display_name = "Scroll Down",
+     .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+     .value = SCRL_DOWN},
+    {.display_name = "Scroll Left",
+     .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+     .value = SCRL_LEFT},
+    {.display_name = "Scroll Right",
+     .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+     .value = SCRL_RIGHT},
+};
+
+static const struct behavior_parameter_metadata_set mouse_scroll_param_metadata_set[] = {{
+    .param1_values = mouse_scroll_param_values,
+    .param1_values_len = ARRAY_SIZE(mouse_scroll_param_values),
+}};
+
+static const struct behavior_parameter_metadata mouse_scroll_metadata = {
+    .sets_len = ARRAY_SIZE(mouse_scroll_param_metadata_set),
+    .sets = mouse_scroll_param_metadata_set,
+};
+
+static int
+behavior_input_two_axis_get_parameter_metadata(const struct device *dev,
+                                               struct behavior_parameter_metadata *param_metadata) {
+    const struct behavior_input_two_axis_config *cfg = dev->config;
+
+    if (cfg->x_code == INPUT_REL_X && cfg->y_code == INPUT_REL_Y) {
+        *param_metadata = mouse_move_metadata;
+        return 0;
+    }
+
+    if (cfg->x_code == INPUT_REL_HWHEEL && cfg->y_code == INPUT_REL_WHEEL) {
+        *param_metadata = mouse_scroll_metadata;
+        return 0;
+    }
+
+    return -ENOTSUP;
+}
+
+#endif // IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
 
 #if CONFIG_MINIMAL_LIBC
 static float powf(float base, float exponent) {
@@ -103,6 +168,9 @@ static uint8_t get_acceleration_exponent(const struct behavior_input_two_axis_co
 
 static inline uint8_t get_acceleration_exponent(const struct behavior_input_two_axis_config *config,
                                                 uint16_t code) {
+    if (config->x_code == INPUT_REL_X && config->y_code == INPUT_REL_Y) {
+        return zmk_pointing_settings_acceleration();
+    }
     return config->acceleration_exponent;
 }
 
@@ -134,6 +202,24 @@ static void track_remainder(float *move, float *remainder) {
     *move = (int)new_move;
 }
 
+static float runtime_max_speed(const struct behavior_input_two_axis_config *config, uint16_t code,
+                               int16_t requested_speed) {
+    if (requested_speed == 0) {
+        return 0;
+    }
+
+    int16_t magnitude;
+    if (config->x_code == INPUT_REL_X && config->y_code == INPUT_REL_Y) {
+        magnitude = zmk_pointing_settings_move_speed();
+    } else if (config->x_code == INPUT_REL_HWHEEL && config->y_code == INPUT_REL_WHEEL) {
+        magnitude = zmk_pointing_settings_scroll_speed();
+    } else {
+        magnitude = requested_speed < 0 ? -requested_speed : requested_speed;
+    }
+
+    return requested_speed < 0 ? -(float)magnitude : (float)magnitude;
+}
+
 static float update_movement_1d(const struct behavior_input_two_axis_config *config, uint16_t code,
                                 struct movement_state_1d *state, int64_t now) {
     float move = 0;
@@ -143,11 +229,11 @@ static float update_movement_1d(const struct behavior_input_two_axis_config *con
     }
 
     int64_t move_duration = ticks_since_start(state->start_time, now, config->delay_ms);
-    LOG_DBG("Calculated speed: %f", (double)speed(config, code, state->speed, move_duration));
-    move =
-        (move_duration > 0)
-            ? (speed(config, code, state->speed, move_duration) * config->trigger_period_ms / 1000)
-            : 0;
+    float max_speed = runtime_max_speed(config, code, state->speed);
+    LOG_DBG("Calculated speed: %f", (double)speed(config, code, max_speed, move_duration));
+    move = (move_duration > 0)
+               ? (speed(config, code, max_speed, move_duration) * config->trigger_period_ms / 1000)
+               : 0;
 
     track_remainder(&(move), &(state->remainder));
 
@@ -284,7 +370,12 @@ static int on_keymap_binding_released(struct zmk_behavior_binding *binding,
 }
 
 static const struct behavior_driver_api behavior_input_two_axis_driver_api = {
-    .binding_pressed = on_keymap_binding_pressed, .binding_released = on_keymap_binding_released};
+    .binding_pressed = on_keymap_binding_pressed,
+    .binding_released = on_keymap_binding_released,
+#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+    .get_parameter_metadata = behavior_input_two_axis_get_parameter_metadata,
+#endif // IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+};
 
 #define ITA_INST(n)                                                                                \
     static struct behavior_input_two_axis_data behavior_input_two_axis_data_##n = {};              \

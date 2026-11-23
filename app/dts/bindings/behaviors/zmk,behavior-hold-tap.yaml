@@ -49,3 +49,7 @@ properties:
     default: []
   hold-trigger-on-release:
     type: boolean
+  runtime-editable:
+    type: boolean
+  runtime-default-active:
+    type: boolean

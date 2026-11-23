@@ -32,6 +32,8 @@ static const uint8_t display_led_idx = DT_NODE_CHILD_IDX(DT_CHOSEN(zmk_display_l
 #endif
 
 static bool initialized = false;
+/* Manual power is independent of activity-driven idle blanking. */
+static bool manual_display_power_enabled = true;
 
 static lv_obj_t *screen;
 
@@ -62,6 +64,9 @@ void display_timer_cb() { k_work_submit_to_queue(zmk_display_work_q(), &display_
 K_TIMER_DEFINE(display_timer, display_timer_cb, NULL);
 
 void unblank_display_cb(struct k_work *work) {
+    if (!manual_display_power_enabled) {
+        return;
+    }
 #if DT_HAS_CHOSEN(zmk_display_led)
     led_on(display_led, display_led_idx);
 #endif
@@ -72,8 +77,6 @@ void unblank_display_cb(struct k_work *work) {
 #endif // !IS_ENABLED(CONFIG_ARCH_POSIX)
 }
 
-#if IS_ENABLED(CONFIG_ZMK_DISPLAY_BLANK_ON_IDLE)
-
 void blank_display_cb(struct k_work *work) {
 #if !IS_ENABLED(CONFIG_ARCH_POSIX)
     k_timer_stop(&display_timer);
@@ -83,8 +86,30 @@ void blank_display_cb(struct k_work *work) {
     led_off(display_led, display_led_idx);
 #endif
 }
+
 K_WORK_DEFINE(blank_display_work, blank_display_cb);
 K_WORK_DEFINE(unblank_display_work, unblank_display_cb);
+
+static void manual_display_power_toggle_cb(struct k_work *work) {
+    manual_display_power_enabled = !manual_display_power_enabled;
+    if (manual_display_power_enabled) {
+        unblank_display_cb(work);
+    } else {
+        blank_display_cb(work);
+    }
+}
+
+K_WORK_DEFINE(manual_display_power_toggle_work, manual_display_power_toggle_cb);
+
+void zmk_display_toggle_manual_power(void) {
+    if (!initialized) {
+        return;
+    }
+
+    k_work_submit_to_queue(zmk_display_work_q(), &manual_display_power_toggle_work);
+}
+
+#if IS_ENABLED(CONFIG_ZMK_DISPLAY_BLANK_ON_IDLE)
 
 static void start_display_updates() {
     if (display == NULL) {
