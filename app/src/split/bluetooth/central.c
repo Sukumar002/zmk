@@ -274,6 +274,8 @@ int release_peripheral_slot(int index) {
     // Clean up previously discovered handles;
     slot->subscribe_params.value_handle = 0;
     slot->run_behavior_handle = 0;
+    slot->charge_status_handle = 0;
+    slot->charge_status_subscribe_params.value_handle = 0;
     slot->peripheral_side_handle = 0;
     slot->side = ZMK_SPLIT_PERIPHERAL_SIDE_UNKNOWN;
     slot->side_identity_valid = false;
