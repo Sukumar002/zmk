@@ -78,6 +78,7 @@ if ((NOT CONFIG_ZMK_SPLIT) OR CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
   target_sources(app PRIVATE src/keymap.c)
   target_sources(app PRIVATE src/events/layer_state_changed.c)
   target_sources(app PRIVATE src/events/modifiers_state_changed.c)
+  target_sources(app PRIVATE src/events/layout_shift_state_changed.c)
   target_sources(app PRIVATE src/events/keycode_state_changed.c)
   target_sources_ifdef(CONFIG_ZMK_HID_INDICATORS app PRIVATE src/hid_indicators.c)
 
