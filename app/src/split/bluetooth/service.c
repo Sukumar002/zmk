@@ -34,6 +34,11 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #include <zmk/events/sensor_event.h>
 #include <zmk/sensors.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/battery_state_changed.h>
+#include <zmk/events/usb_conn_state_changed.h>
+#include <zmk/battery.h>
+#include <zmk/usb.h>
 
 #if ZMK_KEYMAP_HAS_SENSORS
 static struct sensor_event last_sensor_event;
@@ -55,6 +60,53 @@ static uint8_t num_of_positions = ZMK_KEYMAP_LEN;
 static uint8_t position_state[POS_STATE_LEN];
 static uint8_t peripheral_side = CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_SIDE;
 
+/*
+ * Charge state is intentionally conservative: report charging only when USB
+ * power is present and a battery reading is available between 1% and 99%.
+ * Boards without USB/battery reporting simply expose "not charging".
+ */
+static uint8_t peripheral_charging;
+
+static uint8_t split_svc_get_charge_status(void) {
+#if IS_ENABLED(CONFIG_USB_DEVICE_STACK) && IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)
+    const uint8_t level = zmk_battery_state_of_charge();
+    return zmk_usb_is_powered() && level > 0 && level < 100;
+#else
+    return 0;
+#endif
+}
+
+static void split_svc_update_charge_status(void) {
+    const uint8_t next = split_svc_get_charge_status();
+    if (next == peripheral_charging) {
+        return;
+    }
+
+    peripheral_charging = next;
+    for (size_t i = 0; i < split_svc.attr_count; i++) {
+        if (bt_uuid_cmp(split_svc.attrs[i].uuid,
+                        BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_CHARGE_STATUS_UUID)) == 0) {
+            int err = bt_gatt_notify(NULL, &split_svc.attrs[i], &peripheral_charging,
+                                     sizeof(peripheral_charging));
+            if (err && err != -ENOTCONN) {
+                LOG_DBG("Unable to notify peripheral charge status (%d)", err);
+            }
+            break;
+        }
+    }
+}
+
+static int split_svc_charge_status_listener(const zmk_event_t *eh) {
+    if (as_zmk_usb_conn_state_changed(eh) || as_zmk_battery_state_changed(eh)) {
+        split_svc_update_charge_status();
+    }
+    return ZMK_EV_EVENT_BUBBLE;
+}
+
+ZMK_LISTENER(split_svc_charge_status, split_svc_charge_status_listener);
+ZMK_SUBSCRIPTION(split_svc_charge_status, zmk_usb_conn_state_changed);
+ZMK_SUBSCRIPTION(split_svc_charge_status, zmk_battery_state_changed);
+
 static ssize_t split_svc_peripheral_side(struct bt_conn *conn, const struct bt_gatt_attr *attrs,
                                          void *buf, uint16_t len, uint16_t offset) {
     if (peripheral_side > 2) {
@@ -62,6 +114,18 @@ static ssize_t split_svc_peripheral_side(struct bt_conn *conn, const struct bt_g
     }
     return bt_gatt_attr_read(conn, attrs, buf, len, offset, &peripheral_side,
                              sizeof(peripheral_side));
+}
+
+static ssize_t split_svc_charge_status(struct bt_conn *conn,
+                                          const struct bt_gatt_attr *attrs, void *buf,
+                                          uint16_t len, uint16_t offset) {
+    peripheral_charging = split_svc_get_charge_status();
+    return bt_gatt_attr_read(conn, attrs, buf, len, offset, &peripheral_charging,
+                             sizeof(peripheral_charging));
+}
+
+static void split_svc_charge_status_ccc(const struct bt_gatt_attr *attr, uint16_t value) {
+    LOG_DBG("charge status CCC value %d", value);
 }
 
 static struct zmk_split_run_behavior_payload behavior_run_payload;
@@ -218,7 +282,13 @@ BT_GATT_SERVICE_DEFINE(
     /* Append this characteristic to preserve all legacy split attribute handles. */
     BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_PERIPHERAL_SIDE_UUID),
                            BT_GATT_CHRC_READ, BT_GATT_PERM_READ_ENCRYPT, split_svc_peripheral_side,
-                           NULL, &peripheral_side), );
+                           NULL, &peripheral_side),
+    /* Appended to preserve every existing split-service attribute handle. */
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_CHARGE_STATUS_UUID),
+                           BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ_ENCRYPT,
+                           split_svc_charge_status, NULL, &peripheral_charging),
+    BT_GATT_CCC(split_svc_charge_status_ccc,
+                BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT), );
 
 K_THREAD_STACK_DEFINE(service_q_stack, CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_STACK_SIZE);
 
