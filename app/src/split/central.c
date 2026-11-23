@@ -26,6 +26,7 @@ const struct zmk_split_transport_central *active_transport;
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
 
 static uint8_t peripheral_battery_levels[ZMK_SPLIT_CENTRAL_PERIPHERAL_COUNT] = {0};
+static bool peripheral_battery_charging[ZMK_SPLIT_CENTRAL_PERIPHERAL_COUNT] = {false};
 
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
 
@@ -58,8 +59,21 @@ int zmk_split_transport_central_peripheral_event_handler(
         struct zmk_peripheral_battery_state_changed battery_ev = {
             .source = source,
             .state_of_charge = ev.data.battery_event.level,
+            .charging = peripheral_battery_charging[source],
         };
         peripheral_battery_levels[source] = ev.data.battery_event.level;
+        return raise_zmk_peripheral_battery_state_changed(battery_ev);
+    }
+    case ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_CHARGE_STATUS_EVENT: {
+        if (source >= ARRAY_SIZE(peripheral_battery_charging)) {
+            return -EINVAL;
+        }
+        peripheral_battery_charging[source] = ev.data.charge_status_event.charging;
+        struct zmk_peripheral_battery_state_changed battery_ev = {
+            .source = source,
+            .state_of_charge = peripheral_battery_levels[source],
+            .charging = peripheral_battery_charging[source],
+        };
         return raise_zmk_peripheral_battery_state_changed(battery_ev);
     }
 #endif
