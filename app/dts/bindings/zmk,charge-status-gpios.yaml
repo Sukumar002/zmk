@@ -1,0 +1,7 @@
+description: Optional GPIO input asserted while the peripheral battery charger is actively charging.
+compatible: "zmk,charge-status-gpios"
+include: base.yaml
+properties:
+  gpios:
+    type: phandle-array
+    required: true
