@@ -204,6 +204,15 @@ static int send_response(const zmk_studio_Response *resp) {
          * Otherwise endpoint changes and subsequent Studio notifications
          * can block forever while trying to acquire the transport mutex.
          */
+        /*
+         * Terminate the partially written frame so the Studio client can
+         * discard this response and resume parsing the next one.
+         */
+        framing_byte = FRAMING_EOF;
+        if (ring_buf_put(&rpc_tx_buf, &framing_byte, 1) == 1) {
+            selected_transport->tx_notify(&rpc_tx_buf, 1, true, user_data);
+        }
+
         k_mutex_unlock(&rpc_transport_mutex);
         return -EINVAL;
     }
