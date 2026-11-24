@@ -157,6 +157,17 @@ static int zmk_battery_init(void) {
         return -ENODEV;
     }
 
+#if IS_ENABLED(CONFIG_BT_BAS)
+    /*
+     * Zephyr BAS starts with a default level of 100. Split centrals can
+     * subscribe before the first sensor sample is fetched, making that
+     * placeholder look like a real full battery for the startup interval.
+     * Publish an explicit unknown/empty value first; the first successful
+     * sensor sample below replaces it with the measured percentage.
+     */
+    bt_bas_set_battery_level(0);
+#endif
+
     zmk_battery_start_reporting();
     return 0;
 }
